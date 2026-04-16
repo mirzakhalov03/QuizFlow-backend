@@ -1,7 +1,7 @@
-const js = require('@eslint/js');
-const globals = require('globals');
-const tseslint = require('typescript-eslint');
-const importPlugin = require('eslint-plugin-import');
+const js = require('@eslint/js')
+const globals = require('globals')
+const tseslint = require('typescript-eslint')
+const importPlugin = require('eslint-plugin-import')
 
 module.exports = tseslint.config(
   {
@@ -40,4 +40,4 @@ module.exports = tseslint.config(
       ],
     },
   },
-);
+)
