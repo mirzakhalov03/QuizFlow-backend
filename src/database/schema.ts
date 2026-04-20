@@ -4,9 +4,12 @@ import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   fullName: text('full_name').notNull(),
-  email: text('email').notNull(),
+  email: text('email').notNull().unique(),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
 
 export const userProfiles = pgTable('user_profiles', {
@@ -18,7 +21,10 @@ export const userProfiles = pgTable('user_profiles', {
   bio: text('bio'),
   profilePicture: text('profile_picture'),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
 
 export const userIntegrations = pgTable('user_integrations', {
@@ -30,7 +36,10 @@ export const userIntegrations = pgTable('user_integrations', {
   refreshToken: text('refresh_token').notNull(),
   provider: text('provider').notNull(),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
 
 export const userApiKeys = pgTable('user_api_keys', {
@@ -41,7 +50,10 @@ export const userApiKeys = pgTable('user_api_keys', {
   keyName: text('key_name').notNull(),
   keyValue: text('key_value').notNull(),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
 
 export const usersRelations = relations(users, ({ many, one }) => ({
