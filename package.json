@@ -6,6 +6,8 @@
     "dev": "nodemon --watch src --ext ts --exec \"ts-node ./src/server.ts\"",
     "build": "tsc",
     "start": "node ./dist/src/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
