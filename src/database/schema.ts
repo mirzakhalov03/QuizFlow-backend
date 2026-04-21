@@ -70,8 +70,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
     fields: [users.id],
     references: [userProfiles.userId],
   }),
+
   integrations: many(userIntegrations),
   apiKeys: many(userApiKeys),
+  quizzes: many(quizzes),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -142,7 +144,7 @@ export const questions = pgTable('questions', {
   text: text('text').notNull(),
 
   type: questionTypeEnum('type').notNull(),
-  //Don't miss this one guys(ladies ?_?), it is for question's position in the list
+
   position: integer('position').notNull(),
 
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
@@ -175,3 +177,28 @@ export const questionOptions = pgTable('question_options', {
     .notNull()
     .$onUpdate(() => new Date()),
 })
+
+export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [quizzes.userId],
+    references: [users.id],
+  }),
+
+  questions: many(questions),
+}))
+
+export const questionsRelations = relations(questions, ({ one, many }) => ({
+  quiz: one(quizzes, {
+    fields: [questions.quizId],
+    references: [quizzes.id],
+  }),
+
+  options: many(questionOptions),
+}))
+
+export const questionOptionsRelations = relations(questionOptions, ({ one }) => ({
+  question: one(questions, {
+    fields: [questionOptions.questionId],
+    references: [questions.id],
+  }),
+}))
