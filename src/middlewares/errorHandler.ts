@@ -5,17 +5,27 @@ import { AppError } from '../helpers/AppError'
 
 export const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const isOperationalError = err instanceof AppError
+  const isProduction = process.env.NODE_ENV === 'production'
 
   const statusCode = isOperationalError ? err.statusCode : 500
-  const message = isOperationalError ? err.message : 'Something went wrong'
-  const code = isOperationalError ? err.code : 'INTERNAL_ERROR'
+  const message =
+    isOperationalError || !isProduction
+      ? err instanceof Error
+        ? err.message
+        : String(err)
+      : 'Something went wrong'
+  const code = isOperationalError
+    ? err.code
+    : err instanceof Error && typeof (err as { code?: unknown }).code === 'string'
+      ? (err as { code?: string }).code
+      : 'INTERNAL_ERROR'
 
   const errorPayload = {
     code,
     details: isOperationalError ? (err.details ?? null) : null,
   }
 
-  if (process.env.NODE_ENV !== 'production' && !isOperationalError && err instanceof Error) {
+  if (!isProduction && err instanceof Error) {
     Object.assign(errorPayload, { stack: err.stack ?? null })
   }
 
