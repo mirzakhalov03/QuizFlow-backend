@@ -113,7 +113,7 @@ export const quizzes = pgTable('quizzes', {
 
   userId: uuid('user_id')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: 'cascade' }),
 
   type: questionTypeEnum('type'),
 
@@ -132,6 +132,11 @@ export const quizzes = pgTable('quizzes', {
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
 
   uploadedAt: timestamp('uploaded_at', { mode: 'date' }),
+
+  updatedAt: timestamp('updated_at', { mode: 'date' })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 })
 
 export const questions = pgTable('questions', {
