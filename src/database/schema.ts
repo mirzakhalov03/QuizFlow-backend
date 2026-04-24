@@ -7,6 +7,8 @@ import {
   uuid,
   boolean,
   integer,
+  index,
+  unique,
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
@@ -74,6 +76,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   integrations: many(userIntegrations),
   apiKeys: many(userApiKeys),
   quizzes: many(quizzes),
+  answers: many(userAnswers),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -183,6 +186,53 @@ export const questionOptions = pgTable('question_options', {
     .$onUpdate(() => new Date()),
 })
 
+export const userAnswers = pgTable(
+  'user_answers',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    selectedOptionId: uuid('selected_option_id').references(() => questionOptions.id, {
+      onDelete: 'cascade',
+    }),
+    textAnswer: text('text_answer'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('user_answers_user_id_idx').on(table.userId),
+
+    questionIdIdx: index('user_answers_question_id_idx').on(table.questionId),
+
+    userQuestionUnique: unique('user_answers_user_question_unique').on(
+      table.userId,
+      table.questionId,
+    ),
+  }),
+)
+
+export const userAnswerRelations = relations(userAnswers, ({ one }) => ({
+  user: one(users, {
+    fields: [userAnswers.userId],
+    references: [users.id],
+  }),
+  question: one(questions, {
+    fields: [userAnswers.questionId],
+    references: [questions.id],
+  }),
+  selectedOption: one(questionOptions, {
+    fields: [userAnswers.selectedOptionId],
+    references: [questionOptions.id],
+  }),
+}))
+
 export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
   user: one(users, {
     fields: [quizzes.userId],
@@ -199,11 +249,13 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   }),
 
   options: many(questionOptions),
+  answers: many(userAnswers),
 }))
 
-export const questionOptionsRelations = relations(questionOptions, ({ one }) => ({
+export const questionOptionsRelations = relations(questionOptions, ({ one, many }) => ({
   question: one(questions, {
     fields: [questionOptions.questionId],
     references: [questions.id],
   }),
+  answers: many(userAnswers),
 }))
