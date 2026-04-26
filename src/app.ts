@@ -5,7 +5,7 @@ import logger from 'morgan'
 import { successResponse } from './helpers/apiResponse'
 import { errorHandler } from './middlewares/errorHandler'
 import { notFoundHandler } from './middlewares/notFound'
-
+import authRoutes from './routes/auth'
 const app = express()
 
 app.use(logger('dev'))
@@ -16,6 +16,8 @@ app.use(cookieParser())
 app.get('/health', (_req, res) => {
   res.status(200).json(successResponse('API is healthy', { uptime: process.uptime() }))
 })
+
+app.use('/auth', authRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)
