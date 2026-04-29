@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { Readable } from 'stream'
 
 import type { Request } from 'express'
@@ -6,24 +7,34 @@ import { AppError } from '../AppError'
 
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
 
-export type MulterRequest = Request & { files?: Express.Multer.File[] }
+export type MulterRequest = Request & { file?: Express.Multer.File; files?: Express.Multer.File[] }
 
 const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '-')
 
 export const buildS3Key = (file: Express.Multer.File) => {
   const safeName = sanitizeFileName(file.originalname || 'upload')
-  return `uploads/${Date.now()}-${safeName}`
+  return `uploads/${randomUUID()}-${safeName}`
 }
 
 export const getFirstUploadedFile = (req: Request) => {
-  const { files } = req as MulterRequest
-  const file = files?.[0]
+  const { file, files } = req as MulterRequest
+  const resolvedFile = file ?? files?.[0]
 
-  if (!file) {
+  if (!resolvedFile) {
     throw new AppError('File is required', 400, 'VALIDATION_ERROR')
   }
 
-  return file
+  return resolvedFile
+}
+
+export const getUploadedFiles = (req: Request) => {
+  const { files } = req as MulterRequest
+
+  if (!files || files.length === 0) {
+    throw new AppError('At least one file is required', 400, 'VALIDATION_ERROR')
+  }
+
+  return files
 }
 
 export const isReadableStream = (value: unknown): value is Readable =>

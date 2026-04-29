@@ -1,18 +1,22 @@
 import type { Request, Response, NextFunction } from 'express'
 
-import { buildS3Key, getFirstUploadedFile } from '../helpers/utils/uploadUtils'
+import { buildS3Key, getUploadedFiles } from '../helpers/utils/uploadUtils'
 import { uploadFile } from '../services/uploadFile'
 
 export const uploadFileController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const file = getFirstUploadedFile(req)
+    const files = getUploadedFiles(req)
 
-    const { key, url } = await uploadFile(file.buffer, {
-      contentType: file.mimetype,
-      key: buildS3Key(file),
-    })
+    const uploads = await Promise.all(
+      files.map((file) =>
+        uploadFile(file.buffer, {
+          contentType: file.mimetype,
+          key: buildS3Key(file),
+        }),
+      ),
+    )
 
-    res.status(201).json({ key, url })
+    res.status(201).json(uploads)
   } catch (error) {
     next(error)
   }

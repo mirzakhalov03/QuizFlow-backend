@@ -17,7 +17,13 @@ export const handleMulterError = (
 ) => {
   if (err instanceof MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return next(new AppError('File size exceeds 25MB limit', 413, 'FILE_TOO_LARGE'))
+      return next(
+        new AppError(
+          'File size exceeds ' + MAX_FILE_SIZE_BYTES / (1024 * 1024) + 'MB limit',
+          413,
+          'FILE_TOO_LARGE',
+        ),
+      )
     }
 
     return next(new AppError(err.message, 400, 'UPLOAD_ERROR'))
