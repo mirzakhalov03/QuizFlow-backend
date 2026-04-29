@@ -156,14 +156,14 @@ export const userAnswers = pgTable(
   }),
 )
 
-export const quizzResults = pgTable(
+export const quizResults = pgTable(
   'quiz_results',
   {
     id: uuid('id').primaryKey().defaultRandom().notNull(),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    quizzId: uuid('quiz_id')
+    quizId: uuid('quiz_id')
       .notNull()
       .references(() => quizzes.id, { onDelete: 'cascade' }),
     totalQuestions: integer('total_questions').notNull(),
@@ -177,8 +177,8 @@ export const quizzResults = pgTable(
   },
   (table) => ({
     userIdIdx: index('quiz_results_user_id_idx').on(table.userId),
-    quizIdIdx: index('quiz_results_quiz_id_idx').on(table.quizzId),
-    userQuizUnique: unique('quiz_results_user_quiz_unique').on(table.userId, table.quizzId),
+    quizIdIdx: index('quiz_results_quiz_id_idx').on(table.quizId),
+    userQuizUnique: unique('quiz_results_user_quiz_unique').on(table.userId, table.quizId),
   }),
 )
 
@@ -191,7 +191,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   apiKeys: many(userApiKeys),
   quizzes: many(quizzes),
   answers: many(userAnswers),
-  quizzResults: many(quizzResults),
+  quizResults: many(quizResults),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -221,7 +221,7 @@ export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
     references: [users.id],
   }),
   questions: many(questions),
-  quizzResults: many(quizzResults),
+  quizResults: many(quizResults),
 }))
 
 export const questionsRelations = relations(questions, ({ one, many }) => ({
@@ -256,13 +256,13 @@ export const userAnswerRelations = relations(userAnswers, ({ one }) => ({
   }),
 }))
 
-export const quizzResultsRelations = relations(quizzResults, ({ one }) => ({
+export const quizResultsRelations = relations(quizResults, ({ one }) => ({
   user: one(users, {
-    fields: [quizzResults.userId],
+    fields: [quizResults.userId],
     references: [users.id],
   }),
-  quizz: one(quizzes, {
-    fields: [quizzResults.quizzId],
+  quiz: one(quizzes, {
+    fields: [quizResults.quizId],
     references: [quizzes.id],
   }),
 }))
