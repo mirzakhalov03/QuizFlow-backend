@@ -204,9 +204,8 @@ const notionCallback = async (req: AuthRequest, res: Response) => {
         .update(userIntegrations)
         .set({
           accessToken: data.access_token,
-          updatedAt: new Date(),
         })
-        .where(eq(userIntegrations.userId, user.id))
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'notion')))
     }
 
     return res.redirect('http://localhost:5173/integrations/success')
