@@ -12,7 +12,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "validate": "npm run format && npm run lint:fix && npm run prepare"
   },
   "lint-staged": {
     "*.ts": [
@@ -23,6 +24,7 @@
     ]
   },
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.895.0",
     "@aws-sdk/client-s3": "^3.895.0",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",

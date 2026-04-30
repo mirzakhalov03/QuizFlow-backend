@@ -14,6 +14,7 @@ dist-ssr
 .env
 .env.*.local
 bin
+progress.md
 
 # Editor directories and files
 .vscode/*
