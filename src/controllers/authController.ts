@@ -1,14 +1,38 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, and } from 'drizzle-orm'
 import { Request, Response } from 'express'
 
 import { db } from '../database/database'
 import { users } from '../database/schema'
+import { userIntegrations } from '../database/schema'
 import User from '../models/user.model'
+import UserIntegrations from '../models/userIntegration.model'
+import userProfile from '../models/userProfile.model'
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt'
 
-const loginUser = async (req: Request, res: Response) => {}
+type AuthUser = {
+  id: string
+  email?: string
+}
 
-const logoutUser = (req: Request, res: Response) => {}
+type AuthRequest = Request & {
+  user?: AuthUser
+}
+
+const logoutUser = (req: Request, res: Response) => {
+  try {
+    res.clearCookie('accessToken', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    })
+
+    return res.status(200).json({ message: 'Logged out successfully' })
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
+/*-- Google OAuth2 Flow--*/
 
 const redirectUser = async (req: Request, res: Response) => {
   await db.execute(sql`SELECT 1`)
@@ -23,7 +47,6 @@ const redirectUser = async (req: Request, res: Response) => {
     '&scope=openid email profile'
   res.redirect(googleAuthUrl)
 }
-
 const googleCallback = async (req: Request, res: Response) => {
   try {
     const code = req.query.code as string
@@ -65,6 +88,35 @@ const googleCallback = async (req: Request, res: Response) => {
         fullName: profile.name,
       }))
 
+    const existingProfile = await userProfile.findByUserId(user.id)
+
+    if (!existingProfile) {
+      await userProfile.createUserProfile({
+        userId: user.id,
+        bio: null,
+        profilePicture: profile.picture ?? null,
+      })
+    }
+
+    const existingIntegration = await UserIntegrations.findByUserIdAndProvider(user.id, 'google')
+
+    if (!existingIntegration) {
+      await UserIntegrations.createUser({
+        userId: user.id,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? '',
+        provider: 'google',
+      })
+    } else {
+      await db
+        .update(userIntegrations)
+        .set({
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? existingIntegration.refreshToken,
+        })
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'google')))
+    }
+
     const accessToken = generateAccessToken(user)
     const refreshToken = generateRefreshToken(user)
 
@@ -76,10 +128,91 @@ const googleCallback = async (req: Request, res: Response) => {
       sameSite: 'lax',
     })
 
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    })
+
     return res.redirect('http://localhost:5173/auth/success')
   } catch (error) {
     console.error(error)
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
-export { loginUser, logoutUser, redirectUser, googleCallback }
+
+/*-- Notion OAuth2 Flow--*/
+
+const redirectToNotion = (req: Request, res: Response) => {
+  const notionAuthUrl =
+    `https://api.notion.com/v1/oauth/authorize` +
+    `?client_id=${process.env.NOTION_CLIENT_ID}` +
+    `&response_type=code` +
+    `&owner=user` +
+    `&redirect_uri=${encodeURIComponent(process.env.NOTION_REDIRECT_URI!)}`
+
+  return res.redirect(notionAuthUrl)
+}
+const notionCallback = async (req: AuthRequest, res: Response) => {
+  try {
+    const code = req.query.code as string
+
+    if (!code) {
+      return res.status(400).json({ message: 'No code provided' })
+    }
+
+    const user = req.user
+
+    if (!user) {
+      return res.status(401).json({ message: 'Unauthorized' })
+    }
+
+    const tokenResponse = await fetch('https://api.notion.com/v1/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization:
+          'Basic ' +
+          Buffer.from(
+            `${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`,
+          ).toString('base64'),
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: process.env.NOTION_REDIRECT_URI,
+      }),
+    })
+
+    const data = await tokenResponse.json()
+
+    if (!data?.access_token) {
+      return res.status(400).json({ message: 'Failed to get Notion token' })
+    }
+
+    const existingIntegration = await UserIntegrations.findByUserIdAndProvider(user.id, 'notion')
+
+    if (!existingIntegration) {
+      await UserIntegrations.createUser({
+        userId: user.id,
+        accessToken: data.access_token,
+        refreshToken: '',
+        provider: 'notion',
+      })
+    } else {
+      await db
+        .update(userIntegrations)
+        .set({
+          accessToken: data.access_token,
+          updatedAt: new Date(),
+        })
+        .where(eq(userIntegrations.userId, user.id))
+    }
+
+    return res.redirect('http://localhost:5173/integrations/success')
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ message: 'Internal server error' })
+  }
+}
+export { logoutUser, redirectUser, googleCallback, redirectToNotion, notionCallback }

@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { userIntegrations } from '../database/schema'
 
-export default class userIntegration {
+export default class UserIntegrations {
   id: string
   userId: string
   accessToken: string
@@ -11,7 +11,6 @@ export default class userIntegration {
   provider: string
   createdAt: Date
   updatedAt: Date
-
   constructor(
     id: string,
     userId: string,
@@ -24,47 +23,48 @@ export default class userIntegration {
     this.id = id
     this.userId = userId
     this.accessToken = accessToken
-    this.refreshToken = refreshToken
-    this.provider = provider
     this.createdAt = createdAt
     this.updatedAt = updatedAt
+    this.refreshToken = refreshToken
+    this.provider = provider
   }
-  static async createUserIntegration(userIntegrationData: {
+  static async createUser(userData: {
     userId: string
     accessToken: string
     refreshToken: string
     provider: string
     createdAt?: Date
     updatedAt?: Date
-  }): Promise<userIntegration> {
-    const [newUser] = await db.insert(userIntegrations).values(userIntegrationData).returning()
+  }): Promise<UserIntegrations> {
+    const [newUserIntegrations] = await db.insert(userIntegrations).values(userData).returning()
 
-    return new userIntegration(
-      newUser.id,
-      newUser.userId,
-      newUser.accessToken,
-      newUser.refreshToken,
-      newUser.provider,
-      newUser.createdAt,
-      newUser.updatedAt,
+    return new UserIntegrations(
+      newUserIntegrations.id,
+      newUserIntegrations.userId,
+      newUserIntegrations.accessToken,
+      newUserIntegrations.refreshToken,
+      newUserIntegrations.provider,
+      newUserIntegrations.createdAt,
+      newUserIntegrations.updatedAt,
     )
   }
-  static async findByUserId(userId: string): Promise<userIntegration | null> {
-    const userRow = await db
+  static async findByUserIdAndProvider(userId: string, provider: string) {
+    const row = await db
       .select()
       .from(userIntegrations)
-      .where(eq(userIntegrations.userId, userId))
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, provider)))
       .then((rows) => rows[0])
-    if (!userRow) return null
 
-    return new userIntegration(
-      userRow.id,
-      userRow.userId,
-      userRow.accessToken,
-      userRow.refreshToken,
-      userRow.provider,
-      userRow.createdAt,
-      userRow.updatedAt,
+    if (!row) return null
+
+    return new UserIntegrations(
+      row.id,
+      row.userId,
+      row.accessToken,
+      row.refreshToken,
+      row.provider,
+      row.createdAt,
+      row.updatedAt,
     )
   }
 }

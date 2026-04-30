@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken'
 type JwtUser = {
   id: string
   email?: string
-  fullName?: string
 }
 
 export const generateAccessToken = (user: JwtUser) => {
@@ -11,7 +10,6 @@ export const generateAccessToken = (user: JwtUser) => {
     {
       id: user.id,
       email: user.email,
-      name: user.fullName,
     },
     process.env.JWT_SECRET!,
     { expiresIn: '1h' },
