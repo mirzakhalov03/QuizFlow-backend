@@ -7,6 +7,7 @@ import { questionOptions, questions, quizzes } from '../database/schema'
 import {
   normalizeCorrectList,
   normalizeQuestionType,
+  QUIZ_FILE_MAX_BYTES,
   streamToString,
 } from '../helpers/utils/quizLambdaUtils'
 import type { QuestionType } from '../types/questionTypes'
@@ -126,7 +127,11 @@ export const handler = async (event: LambdaEvent) => {
     throw new Error('S3 object has no body')
   }
 
-  const content = await streamToString(s3Response.Body as Readable)
+  const maxBytes = QUIZ_FILE_MAX_BYTES ? Number(QUIZ_FILE_MAX_BYTES) : 5 * 1024 * 1024
+  if (Number.isNaN(maxBytes) || maxBytes <= 0) {
+    throw new Error('QUIZ_FILE_MAX_BYTES must be a positive number')
+  }
+  const content = await streamToString(s3Response.Body as Readable, maxBytes)
   if (event.quiz) {
     const quizRow = await persistQuiz(event.quiz, event, {
       bucket: event.bucket,

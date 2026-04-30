@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { quizzes } from '../database/schema'
@@ -19,26 +19,25 @@ type UpdateQuizInput = {
 }
 
 export const getQuizzes = async ({ userId, limit = 20, offset = 0 }: GetQuizzesParams) => {
-  const filters = userId ? eq(quizzes.userId, userId) : undefined
+  const whereClause = userId ? eq(quizzes.userId, userId) : undefined
 
-  const query = db
+  const items = await db
     .select()
     .from(quizzes)
+    .where(whereClause)
     .orderBy(desc(quizzes.createdAt))
     .limit(limit)
     .offset(offset)
 
-  if (!filters) {
-    return query
+  const [countRow] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(quizzes)
+    .where(whereClause)
+
+  return {
+    items,
+    total: countRow?.total ?? 0,
   }
-
-  return db
-    .select()
-    .from(quizzes)
-    .where(filters)
-    .orderBy(desc(quizzes.createdAt))
-    .limit(limit)
-    .offset(offset)
 }
 
 export const getQuizById = async (id: string, userId?: string) => {

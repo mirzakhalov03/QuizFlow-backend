@@ -124,12 +124,12 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
       throw new AppError('offset must be a non-negative number', 400, 'VALIDATION_ERROR')
     }
 
-    const items = await getQuizzes({ userId, limit, offset })
+    const { items, total } = await getQuizzes({ userId, limit, offset })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {
         items,
-        pagination: { limit, offset, count: items.length },
+        pagination: { limit, offset, count: total },
       }),
     )
   } catch (error) {
