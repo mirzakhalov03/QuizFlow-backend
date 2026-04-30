@@ -12,6 +12,8 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
+import { QUESTION_TYPES } from '../types/questionTypes'
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   fullName: text('full_name').notNull(),
@@ -67,12 +69,7 @@ export const userApiKeys = pgTable('user_api_keys', {
     .$onUpdate(() => new Date()),
 })
 
-export const questionTypeEnum = pgEnum('question_type', [
-  'single_choice',
-  'multiple_choice',
-  'text',
-  'true_false',
-])
+export const questionTypeEnum = pgEnum('question_type', QUESTION_TYPES)
 
 export const quizzes = pgTable('quizzes', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -84,7 +81,6 @@ export const quizzes = pgTable('quizzes', {
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),
-  completeBy: timestamp('complete_by', { mode: 'date' }),
   userInstructions: text('user_instructions'),
   completedAt: timestamp('completed_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
