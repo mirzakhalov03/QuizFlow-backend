@@ -94,17 +94,8 @@ const persistQuiz = async (
   return quizInsert
 }
 
-export const handler = async (event: LambdaEvent) => {
-  if (!event?.bucket || !event?.key || !event?.userId) {
-    throw new Error('bucket, key, and userId are required')
-  }
-
-  const s3Response = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: event.bucket,
-      Key: event.key,
-    }),
-  )
+const fetchSourceText = async (bucket: string, key: string): Promise<string> => {
+  const s3Response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
 
   if (!s3Response.Body) {
     throw new Error('S3 object has no body')
@@ -115,12 +106,18 @@ export const handler = async (event: LambdaEvent) => {
     throw new Error('QUIZ_FILE_MAX_BYTES must be a positive number')
   }
 
-  const content = await streamToString(s3Response.Body as Readable, maxBytes)
+  return streamToString(s3Response.Body as Readable, maxBytes)
+}
+
+export const handler = async (event: LambdaEvent) => {
+  if (!event?.bucket || !event?.key || !event?.userId) {
+    throw new Error('bucket, key, and userId are required')
+  }
 
   const quiz =
     event.quiz ??
     (await generateQuizFromText({
-      sourceText: content,
+      sourceText: await fetchSourceText(event.bucket, event.key),
       questionCount: event.questionCount,
       type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
       userInstructions: event.userInstructions,

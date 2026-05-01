@@ -53,6 +53,7 @@ const buildSchema = (type?: QuestionType) => ({
               : { type: 'string', enum: [...QUESTION_TYPES] },
             options: {
               type: 'array',
+              minItems: 1,
               items: {
                 type: 'object',
                 additionalProperties: false,

@@ -67,8 +67,13 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
     )
   }
 
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: string } }[]
+  let payload: { choices?: { message?: { content?: string } }[] }
+  try {
+    payload = (await response.json()) as typeof payload
+  } catch (error) {
+    throw new AppError('OpenRouter returned an invalid JSON response', 502, 'OPENROUTER_ERROR', {
+      error,
+    })
   }
 
   const content = payload.choices?.[0]?.message?.content
