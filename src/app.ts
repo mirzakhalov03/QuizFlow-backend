@@ -7,6 +7,7 @@ import { swaggerSpec } from './config/swagger'
 import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
+import authRoutes from './routes/auth'
 import healthRoutes from './routes/health.routes'
 import quizRoutes from './routes/quiz.routes'
 import uploadRoutes from './routes/upload.routes'
@@ -20,6 +21,7 @@ app.use(cookieParser())
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
+app.use('/auth', authRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
