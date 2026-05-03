@@ -5,32 +5,15 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { db } from '../database/database'
 import { questionOptions, questions, quizzes } from '../database/schema'
 import {
-  normalizeCorrectList,
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
   streamToString,
 } from '../helpers/utils/quizLambdaUtils'
+import { generateQuizFromText } from '../services/quizAi'
+import type { AiQuiz } from '../services/quizAi'
 import type { QuestionType } from '../types/questionTypes'
 
 const { AWS_REGION } = process.env
-
-type QuizQuestion = {
-  type: QuestionType
-  text: string
-  options?: string[]
-  correct?: string | string[]
-}
-
-type QuizPayload = {
-  id: string
-  title: string
-  questions: QuizQuestion[]
-  metadata: {
-    purpose?: string
-    duration_est?: number
-  }
-  created_at: string
-}
 
 type LambdaEvent = {
   bucket: string
@@ -41,7 +24,8 @@ type LambdaEvent = {
   isTimerEnabled?: boolean
   timerDuration?: number
   type?: string
-  quiz?: QuizPayload
+  questionCount?: number
+  quiz?: AiQuiz
 }
 
 if (!AWS_REGION) {
@@ -51,11 +35,10 @@ if (!AWS_REGION) {
 const s3Client = new S3Client({ region: AWS_REGION })
 
 const persistQuiz = async (
-  payload: QuizPayload,
+  payload: AiQuiz,
   event: LambdaEvent,
   source: { bucket: string; key: string },
 ) => {
-  const metadata = payload.metadata ?? {}
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
@@ -66,8 +49,8 @@ const persistQuiz = async (
         userId: event.userId,
         type: event.type ? normalizeQuestionType(event.type) : undefined,
         properties: {
-          metadata,
           source,
+          generatedBy: 'openrouter',
         },
         isTimerEnabled: Boolean(event.isTimerEnabled),
         timerDuration: event.isTimerEnabled ? (event.timerDuration ?? null) : null,
@@ -77,28 +60,28 @@ const persistQuiz = async (
       .returning({ id: quizzes.id })
 
     for (const [index, question] of questionsList.entries()) {
+      const questionType = normalizeQuestionType(question.type) as QuestionType
+
       const [questionRow] = await tx
         .insert(questions)
         .values({
           quizId: quizRow.id,
           text: question.text,
-          type: normalizeQuestionType(question.type),
+          type: questionType,
           position: index + 1,
         })
         .returning({ id: questions.id })
 
-      const options = question.options ?? []
+      const options = Array.isArray(question.options) ? question.options : []
       if (options.length === 0) {
         continue
       }
 
-      const correctList = normalizeCorrectList(question.correct)
-
-      const optionRows = options.map((optionText, optionIndex) => ({
+      const optionRows = options.map((option, optionIndex) => ({
         questionId: questionRow.id,
-        text: optionText,
-        explanation: null,
-        isCorrect: correctList.includes(optionText.trim()),
+        text: option.text,
+        explanation: option.explanation ?? null,
+        isCorrect: Boolean(option.isCorrect),
         position: optionIndex + 1,
       }))
 
@@ -111,17 +94,8 @@ const persistQuiz = async (
   return quizInsert
 }
 
-export const handler = async (event: LambdaEvent) => {
-  if (!event?.bucket || !event?.key || !event?.userId) {
-    throw new Error('bucket, key, and userId are required')
-  }
-
-  const s3Response = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: event.bucket,
-      Key: event.key,
-    }),
-  )
+const fetchSourceText = async (bucket: string, key: string): Promise<string> => {
+  const s3Response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
 
   if (!s3Response.Body) {
     throw new Error('S3 object has no body')
@@ -131,24 +105,33 @@ export const handler = async (event: LambdaEvent) => {
   if (Number.isNaN(maxBytes) || maxBytes <= 0) {
     throw new Error('QUIZ_FILE_MAX_BYTES must be a positive number')
   }
-  const content = await streamToString(s3Response.Body as Readable, maxBytes)
-  if (event.quiz) {
-    const quizRow = await persistQuiz(event.quiz, event, {
-      bucket: event.bucket,
-      key: event.key,
-    })
 
-    return {
-      statusCode: 200,
-      quizId: quizRow.id,
-      quiz: event.quiz,
-    }
+  return streamToString(s3Response.Body as Readable, maxBytes)
+}
+
+export const handler = async (event: LambdaEvent) => {
+  if (!event?.bucket || !event?.key || !event?.userId) {
+    throw new Error('bucket, key, and userId are required')
   }
+
+  const quiz =
+    event.quiz ??
+    (await generateQuizFromText({
+      sourceText: await fetchSourceText(event.bucket, event.key),
+      questionCount: event.questionCount,
+      type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
+      userInstructions: event.userInstructions,
+      defaultTitle: event.title,
+    }))
+
+  const quizRow = await persistQuiz(quiz, event, {
+    bucket: event.bucket,
+    key: event.key,
+  })
 
   return {
     statusCode: 200,
-    source: { bucket: event.bucket, key: event.key },
-    contentLength: content.length,
-    contentSample: content.slice(0, 1000),
+    quizId: quizRow.id,
+    questionCount: quiz.questions.length,
   }
 }
