@@ -4,7 +4,6 @@ import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
-import type { AuthRequest } from '../middlewares/authMiddleware'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
 import {
   deleteQuizById,
