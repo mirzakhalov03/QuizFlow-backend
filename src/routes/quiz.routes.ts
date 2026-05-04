@@ -78,6 +78,12 @@ router.get('/quizzes/jobs/:jobId', authMiddleware, getJobStatusController)
  *     summary: Retrieve quizzes for the authenticated user
  *     parameters:
  *       - in: query
+ *         name: search
+ *         description: Case-insensitive substring search on quiz title
+ *         schema:
+ *           type: string
+ *         example: biology
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer

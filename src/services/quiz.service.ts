@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
@@ -8,6 +8,8 @@ type GetQuizzesParams = {
   userId: string
   limit?: number
   offset?: number
+  /** Case-insensitive substring search on quiz title */
+  search?: string
 }
 
 type UpdateQuizInput = {
@@ -22,7 +24,11 @@ type UpdateQuizInput = {
  * Fetch a paginated list of quizzes for a user.
  * Uses a single query with a window function to avoid a separate count query.
  */
-export const getQuizzes = async ({ userId, limit = 20, offset = 0 }: GetQuizzesParams) => {
+export const getQuizzes = async ({ userId, limit = 20, offset = 0, search }: GetQuizzesParams) => {
+  const whereClause = search
+    ? and(eq(quizzes.userId, userId), ilike(quizzes.title, `%${search}%`))
+    : eq(quizzes.userId, userId)
+
   const rows = await db
     .select({
       id: quizzes.id,
@@ -40,7 +46,7 @@ export const getQuizzes = async ({ userId, limit = 20, offset = 0 }: GetQuizzesP
       total: sql<number>`count(*) OVER()`.as('total'),
     })
     .from(quizzes)
-    .where(eq(quizzes.userId, userId))
+    .where(whereClause)
     .orderBy(desc(quizzes.createdAt))
     .limit(limit)
     .offset(offset)
@@ -77,9 +83,7 @@ export const getQuizById = async (id: string, userId: string) => {
       ? await db
           .select()
           .from(questionOptions)
-          .where(
-            sql`${questionOptions.questionId} = ANY(${sql.raw(`ARRAY[${questionIds.map((id) => `'${id}'`).join(',')}]::uuid[]`)})`,
-          )
+          .where(inArray(questionOptions.questionId, questionIds))
           .orderBy(questionOptions.position)
       : []
 

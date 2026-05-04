@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
+import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import type { AuthRequest } from '../middlewares/authMiddleware'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
@@ -37,13 +38,11 @@ type PatchQuizBody = {
 const isQuestionType = (value: string): value is QuestionType =>
   QUESTION_TYPES.includes(value as QuestionType)
 
+const DEFAULT_PAGE_LIMIT = 20
+
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // userId always comes from the verified JWT — never from request body
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
     const { s3Url, bucket, key, title, userInstructions, isTimerEnabled, timerDuration, type } =
       req.body as QuizGenerateBody
@@ -113,10 +112,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
 
 export const getJobStatusController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
     const rawJobId = req.params.jobId
     const jobId = typeof rawJobId === 'string' ? rawJobId : rawJobId?.[0]
@@ -137,13 +133,14 @@ export const getJobStatusController = async (req: Request, res: Response, next: 
 
 export const getQuizzesController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
-    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : DEFAULT_PAGE_LIMIT
     const offset = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
+    const search =
+      typeof req.query.search === 'string' && req.query.search.trim()
+        ? req.query.search.trim()
+        : undefined
 
     if (Number.isNaN(limit) || limit <= 0 || limit > 100) {
       throw new AppError('limit must be a number between 1 and 100', 400, 'VALIDATION_ERROR')
@@ -153,7 +150,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
       throw new AppError('offset must be a non-negative number', 400, 'VALIDATION_ERROR')
     }
 
-    const { items, total } = await getQuizzes({ userId, limit, offset })
+    const { items, total } = await getQuizzes({ userId, limit, offset, search })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {
@@ -168,10 +165,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
 
 export const getQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
     const rawId = req.params.id
     const id = typeof rawId === 'string' ? rawId : rawId?.[0]
@@ -192,10 +186,7 @@ export const getQuizByIdController = async (req: Request, res: Response, next: N
 
 export const patchQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
     const rawId = req.params.id
     const id = typeof rawId === 'string' ? rawId : rawId?.[0]
@@ -264,10 +255,7 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
 
 export const deleteQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as AuthRequest).user?.id
-    if (!userId) {
-      throw new AppError('Not authenticated', 401, 'UNAUTHORIZED')
-    }
+    const userId = getAuthUserId(req)
 
     const rawId = req.params.id
     const id = typeof rawId === 'string' ? rawId : rawId?.[0]

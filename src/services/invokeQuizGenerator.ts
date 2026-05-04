@@ -1,4 +1,4 @@
-import { InvokeCommand } from '@aws-sdk/client-lambda'
+import { InvokeCommand, type InvokeCommandOutput } from '@aws-sdk/client-lambda'
 import { eq } from 'drizzle-orm'
 
 import { lambdaClient } from './lambdaClient'
@@ -24,6 +24,9 @@ if (!LAMBDA_QUIZ_GENERATOR_ARN) {
   throw new AppError('LAMBDA_QUIZ_GENERATOR_ARN is not defined', 500, 'CONFIG_ERROR')
 }
 
+const markJobFailed = (jobId: string, error: string) =>
+  db.update(quizJobs).set({ status: 'failed', error }).where(eq(quizJobs.id, jobId))
+
 export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
   // 1. Create a job record in DB so the client can poll for it
   const [job] = await db
@@ -38,15 +41,24 @@ export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
     Payload: Buffer.from(JSON.stringify({ ...payload, jobId: job.id })),
   })
 
-  const response = await lambdaClient.send(command)
+  let response: InvokeCommandOutput
+
+  try {
+    response = await lambdaClient.send(command)
+  } catch (err) {
+    // Network failure, IAM permission error, AWS unavailability, etc.
+    // Mark job failed immediately so the polling client gets actionable feedback.
+    const message = err instanceof Error ? err.message : String(err)
+    await markJobFailed(job.id, `Lambda invocation error: ${message}`)
+    throw new AppError(
+      `Failed to invoke quiz generator Lambda: ${message}`,
+      502,
+      'LAMBDA_INVOKE_FAILED',
+    )
+  }
 
   if (!response.$metadata?.requestId) {
-    // Mark job as failed if we couldn't even trigger Lambda
-    await db
-      .update(quizJobs)
-      .set({ status: 'failed', error: 'Failed to invoke Lambda — no requestId returned' })
-      .where(eq(quizJobs.id, job.id))
-
+    await markJobFailed(job.id, 'Lambda invocation returned no requestId')
     throw new AppError('Failed to invoke quiz generator Lambda', 502, 'LAMBDA_INVOKE_FAILED')
   }
 

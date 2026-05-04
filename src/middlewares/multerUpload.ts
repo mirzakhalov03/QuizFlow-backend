@@ -11,13 +11,15 @@ export const upload = multer({
     if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true)
     } else {
+      // Call the single-argument error overload of FileFilterCallback.
+      // cb(Error) → error path, multer passes it to the global error handler.
+      // Do NOT call cb(null, false) — that silently rejects with no error propagated.
       cb(
         new AppError(
           `Unsupported file type "${file.mimetype}". Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`,
           415,
           'UNSUPPORTED_FILE_TYPE',
-        ) as unknown as null,
-        false,
+        ),
       )
     }
   },
