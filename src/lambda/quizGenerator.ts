@@ -40,6 +40,7 @@ const persistQuiz = async (
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
+    // ── Insert 1: quiz row ──────────────────────────────────────────────────
     const [quizRow] = await tx
       .insert(quizzes)
       .values({
@@ -57,33 +58,37 @@ const persistQuiz = async (
       })
       .returning({ id: quizzes.id })
 
-    for (const [index, question] of questionsList.entries()) {
-      const questionType = normalizeQuestionType(question.type) as QuestionType
+    if (questionsList.length === 0) return quizRow
 
-      const [questionRow] = await tx
-        .insert(questions)
-        .values({
+    // ── Insert 2: all questions in a single statement ───────────────────────
+    // Drizzle guarantees .returning() rows are in the same order as .values(),
+    // so questionRows[i].id safely corresponds to questionsList[i].
+    const questionRows = await tx
+      .insert(questions)
+      .values(
+        questionsList.map((question, index) => ({
           quizId: quizRow.id,
           text: question.text,
-          type: questionType,
+          type: normalizeQuestionType(question.type) as QuestionType,
           position: index + 1,
-        })
-        .returning({ id: questions.id })
+        })),
+      )
+      .returning({ id: questions.id })
 
+    // ── Insert 3: all options for all questions in a single statement ────────
+    const allOptionValues = questionsList.flatMap((question, index) => {
       const options = Array.isArray(question.options) ? question.options : []
-      if (options.length === 0) {
-        continue
-      }
-
-      const optionRows = options.map((option, optionIndex) => ({
-        questionId: questionRow.id,
+      return options.map((option, optionIndex) => ({
+        questionId: questionRows[index].id,
         text: option.text,
         explanation: option.explanation ?? null,
         isCorrect: Boolean(option.isCorrect),
         position: optionIndex + 1,
       }))
+    })
 
-      await tx.insert(questionOptions).values(optionRows)
+    if (allOptionValues.length > 0) {
+      await tx.insert(questionOptions).values(allOptionValues)
     }
 
     return quizRow
