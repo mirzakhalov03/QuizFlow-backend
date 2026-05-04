@@ -1,9 +1,11 @@
 import type { Readable } from 'stream'
 
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { eq } from 'drizzle-orm'
 
-import { db } from '../database/database'
-import { questionOptions, questions, quizzes } from '../database/schema'
+import { getLambdaDb } from './dbClient'
+import { s3Client } from './s3Client'
+import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
@@ -13,9 +15,10 @@ import { generateQuizFromText } from '../services/quizAi'
 import type { AiQuiz } from '../services/quizAi'
 import type { QuestionType } from '../types/questionTypes'
 
-const { AWS_REGION } = process.env
+// Lambda-local clients — no Express app dependencies, no credential env vars required
 
 type LambdaEvent = {
+  jobId: string
   bucket: string
   key: string
   userId: string
@@ -28,17 +31,12 @@ type LambdaEvent = {
   quiz?: AiQuiz
 }
 
-if (!AWS_REGION) {
-  throw new Error('AWS_REGION is not defined')
-}
-
-const s3Client = new S3Client({ region: AWS_REGION })
-
 const persistQuiz = async (
   payload: AiQuiz,
   event: LambdaEvent,
   source: { bucket: string; key: string },
 ) => {
+  const db = await getLambdaDb()
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
@@ -101,37 +99,53 @@ const fetchSourceText = async (bucket: string, key: string): Promise<string> => 
     throw new Error('S3 object has no body')
   }
 
-  const maxBytes = QUIZ_FILE_MAX_BYTES ? Number(QUIZ_FILE_MAX_BYTES) : 5 * 1024 * 1024
-  if (Number.isNaN(maxBytes) || maxBytes <= 0) {
-    throw new Error('QUIZ_FILE_MAX_BYTES must be a positive number')
-  }
-
-  return streamToString(s3Response.Body as Readable, maxBytes)
+  return streamToString(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
 }
 
 export const handler = async (event: LambdaEvent) => {
-  if (!event?.bucket || !event?.key || !event?.userId) {
-    throw new Error('bucket, key, and userId are required')
+  if (!event?.bucket || !event?.key || !event?.userId || !event?.jobId) {
+    throw new Error('bucket, key, userId, and jobId are required')
   }
 
-  const quiz =
-    event.quiz ??
-    (await generateQuizFromText({
-      sourceText: await fetchSourceText(event.bucket, event.key),
-      questionCount: event.questionCount,
-      type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
-      userInstructions: event.userInstructions,
-      defaultTitle: event.title,
-    }))
+  const db = await getLambdaDb()
 
-  const quizRow = await persistQuiz(quiz, event, {
-    bucket: event.bucket,
-    key: event.key,
-  })
+  try {
+    const quiz =
+      event.quiz ??
+      (await generateQuizFromText({
+        sourceText: await fetchSourceText(event.bucket, event.key),
+        questionCount: event.questionCount,
+        type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
+        userInstructions: event.userInstructions,
+        defaultTitle: event.title,
+      }))
 
-  return {
-    statusCode: 200,
-    quizId: quizRow.id,
-    questionCount: quiz.questions.length,
+    const quizRow = await persistQuiz(quiz, event, {
+      bucket: event.bucket,
+      key: event.key,
+    })
+
+    // Update job → done
+    await db
+      .update(quizJobs)
+      .set({ status: 'done', quizId: quizRow.id })
+      .where(eq(quizJobs.id, event.jobId))
+
+    return {
+      statusCode: 200,
+      quizId: quizRow.id,
+      questionCount: quiz.questions.length,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[quizGenerator] Failed:', message, err)
+
+    // Update job → failed with error message
+    await db
+      .update(quizJobs)
+      .set({ status: 'failed', error: message })
+      .where(eq(quizJobs.id, event.jobId))
+
+    throw err
   }
 }

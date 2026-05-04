@@ -1,11 +1,11 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { quizzes } from '../database/schema'
+import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import type { QuestionType } from '../types/questionTypes'
 
 type GetQuizzesParams = {
-  userId?: string
+  userId: string
   limit?: number
   offset?: number
 }
@@ -18,42 +18,87 @@ type UpdateQuizInput = {
   type?: QuestionType | null
 }
 
+/**
+ * Fetch a paginated list of quizzes for a user.
+ * Uses a single query with a window function to avoid a separate count query.
+ */
 export const getQuizzes = async ({ userId, limit = 20, offset = 0 }: GetQuizzesParams) => {
-  const whereClause = userId ? eq(quizzes.userId, userId) : undefined
-
-  const items = await db
-    .select()
+  const rows = await db
+    .select({
+      id: quizzes.id,
+      title: quizzes.title,
+      userId: quizzes.userId,
+      type: quizzes.type,
+      properties: quizzes.properties,
+      isTimerEnabled: quizzes.isTimerEnabled,
+      timerDuration: quizzes.timerDuration,
+      userInstructions: quizzes.userInstructions,
+      completedAt: quizzes.completedAt,
+      createdAt: quizzes.createdAt,
+      uploadedAt: quizzes.uploadedAt,
+      updatedAt: quizzes.updatedAt,
+      total: sql<number>`count(*) OVER()`.as('total'),
+    })
     .from(quizzes)
-    .where(whereClause)
+    .where(eq(quizzes.userId, userId))
     .orderBy(desc(quizzes.createdAt))
     .limit(limit)
     .offset(offset)
 
-  const [countRow] = await db
-    .select({ total: sql<number>`count(*)` })
+  const total = rows[0]?.total ?? 0
+  const items = rows.map(({ total: _total, ...rest }) => rest)
+
+  return { items, total }
+}
+
+/**
+ * Fetch a single quiz with its full nested questions and options.
+ * userId is required — users can only access their own quizzes.
+ */
+export const getQuizById = async (id: string, userId: string) => {
+  const [quiz] = await db
+    .select()
     .from(quizzes)
-    .where(whereClause)
+    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
+    .limit(1)
+
+  if (!quiz) return null
+
+  const questionRows = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.quizId, id))
+    .orderBy(questions.position)
+
+  const questionIds = questionRows.map((q) => q.id)
+
+  const optionRows =
+    questionIds.length > 0
+      ? await db
+          .select()
+          .from(questionOptions)
+          .where(
+            sql`${questionOptions.questionId} = ANY(${sql.raw(`ARRAY[${questionIds.map((id) => `'${id}'`).join(',')}]::uuid[]`)})`,
+          )
+          .orderBy(questionOptions.position)
+      : []
+
+  const optionsByQuestion = optionRows.reduce<Record<string, typeof optionRows>>((acc, option) => {
+    if (!acc[option.questionId]) acc[option.questionId] = []
+    acc[option.questionId].push(option)
+    return acc
+  }, {})
 
   return {
-    items,
-    total: countRow?.total ?? 0,
+    ...quiz,
+    questions: questionRows.map((q) => ({
+      ...q,
+      options: optionsByQuestion[q.id] ?? [],
+    })),
   }
 }
 
-export const getQuizById = async (id: string, userId?: string) => {
-  const whereClause = userId
-    ? and(eq(quizzes.id, id), eq(quizzes.userId, userId))
-    : eq(quizzes.id, id)
-
-  const [quiz] = await db.select().from(quizzes).where(whereClause).limit(1)
-  return quiz ?? null
-}
-
-export const updateQuizById = async (id: string, data: UpdateQuizInput, userId?: string) => {
-  const whereClause = userId
-    ? and(eq(quizzes.id, id), eq(quizzes.userId, userId))
-    : eq(quizzes.id, id)
-
+export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: string) => {
   const [updatedQuiz] = await db
     .update(quizzes)
     .set({
@@ -63,17 +108,31 @@ export const updateQuizById = async (id: string, data: UpdateQuizInput, userId?:
       timerDuration: data.timerDuration,
       type: data.type,
     })
-    .where(whereClause)
+    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
     .returning()
 
   return updatedQuiz ?? null
 }
 
-export const deleteQuizById = async (id: string, userId?: string) => {
-  const whereClause = userId
-    ? and(eq(quizzes.id, id), eq(quizzes.userId, userId))
-    : eq(quizzes.id, id)
+export const deleteQuizById = async (id: string, userId: string) => {
+  const deletedRows = await db
+    .delete(quizzes)
+    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
+    .returning({ id: quizzes.id })
 
-  const deletedRows = await db.delete(quizzes).where(whereClause).returning({ id: quizzes.id })
   return deletedRows.length > 0
+}
+
+/**
+ * Get the status of an async quiz generation job.
+ * Returns the job row so the client can poll until status is 'done' or 'failed'.
+ */
+export const getJobById = async (jobId: string, userId: string) => {
+  const [job] = await db
+    .select()
+    .from(quizJobs)
+    .where(and(eq(quizJobs.id, jobId), eq(quizJobs.userId, userId)))
+    .limit(1)
+
+  return job ?? null
 }

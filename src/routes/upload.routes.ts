@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { uploadFileController } from '../controllers/uploadController'
+import { authMiddleware } from '../middlewares/authMiddleware'
 import { upload } from '../middlewares/multerUpload'
 
 const router = Router()
@@ -12,6 +13,8 @@ const router = Router()
  *     tags:
  *       - Upload
  *     summary: Upload one or more files to S3
+ *     security:
+ *       - cookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -31,7 +34,11 @@ const router = Router()
  *         description: Files uploaded successfully
  *       400:
  *         description: Validation or upload error
+ *       401:
+ *         description: Not authenticated
+ *       415:
+ *         description: Unsupported file type
  */
-router.post('/upload-file', upload.array('file', 10), uploadFileController)
+router.post('/upload-file', authMiddleware, upload.array('file', 10), uploadFileController)
 
 export default router
