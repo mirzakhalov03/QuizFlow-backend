@@ -16,7 +16,7 @@ const router = Router()
  *     description: |
  *       Returns a short-lived (5 min) PUT URL. The client uploads the file directly
  *       to S3 — the file never touches this server. After upload, pass the returned
- *       `key` to `POST /quizzes/generate`.
+ *       `key` to `POST /quizzes/generation`.
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -47,7 +47,7 @@ const router = Router()
  *                   properties:
  *                     key:
  *                       type: string
- *                       description: S3 key — pass to POST /quizzes/generate
+ *                       description: S3 key — pass to POST /quizzes/generation
  *                     uploadUrl:
  *                       type: string
  *                       description: Pre-signed PUT URL — use this to upload directly to S3

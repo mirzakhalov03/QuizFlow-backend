@@ -14,7 +14,7 @@ const router = Router()
 
 /**
  * @openapi
- * /quizzes/generate:
+ * /quizzes/generation:
  *   post:
  *     tags:
  *       - Quiz
@@ -39,7 +39,7 @@ const router = Router()
  *       401:
  *         description: Not authenticated
  */
-router.post('/quizzes/generate', authMiddleware, generateQuizController)
+router.post('/quizzes/generation', authMiddleware, generateQuizController)
 
 /**
  * @openapi

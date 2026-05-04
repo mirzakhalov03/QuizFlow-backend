@@ -9,7 +9,7 @@ import { buildS3ObjectUrl } from '../helpers/utils/uploadUtils'
 const PRESIGNED_URL_EXPIRES_IN_SECONDS = 300
 
 type PresignedUploadResult = {
-  /** S3 key — pass this to POST /quizzes/generate */
+  /** S3 key — pass this to POST /quizzes/generation */
   key: string
   /** Pre-signed PUT URL — client uploads directly to S3 with this */
   uploadUrl: string
