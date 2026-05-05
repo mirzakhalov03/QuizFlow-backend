@@ -9,6 +9,8 @@ import {
   patchQuizByIdController,
 } from '../controllers/quizController'
 import { authMiddleware } from '../middlewares/authMiddleware'
+import { validate, validateQuery } from '../middlewares/validate'
+import { GenerateQuizSchema, GetQuizzesSchema, PatchQuizSchema } from '../validators/quiz.schema'
 
 const router = Router()
 
@@ -39,7 +41,7 @@ const router = Router()
  *       401:
  *         description: Not authenticated
  */
-router.post('/quizzes', authMiddleware, generateQuizController)
+router.post('/quizzes', authMiddleware, validate(GenerateQuizSchema), generateQuizController)
 
 /**
  * @openapi
@@ -104,7 +106,7 @@ router.get('/quizzes/jobs/:jobId', authMiddleware, getJobStatusController)
  *       401:
  *         description: Not authenticated
  */
-router.get('/quizzes', authMiddleware, getQuizzesController)
+router.get('/quizzes', authMiddleware, validateQuery(GetQuizzesSchema), getQuizzesController)
 
 /**
  * @openapi
@@ -164,7 +166,7 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
  *       404:
  *         description: Quiz not found
  */
-router.patch('/quizzes/:id', authMiddleware, patchQuizByIdController)
+router.patch('/quizzes/:id', authMiddleware, validate(PatchQuizSchema), patchQuizByIdController)
 
 /**
  * @openapi

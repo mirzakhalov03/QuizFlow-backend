@@ -3,6 +3,8 @@ import { Router } from 'express'
 import { getPresignedUrlController, uploadFileController } from '../controllers/uploadController'
 import { authMiddleware } from '../middlewares/authMiddleware'
 import { upload } from '../middlewares/multerUpload'
+import { validateQuery } from '../middlewares/validate'
+import { PresignedUrlSchema } from '../validators/upload.schema'
 
 const router = Router()
 
@@ -64,7 +66,12 @@ const router = Router()
  *       415:
  *         description: Unsupported file type
  */
-router.get('/upload/presigned-url', authMiddleware, getPresignedUrlController)
+router.get(
+  '/upload/presigned-url',
+  authMiddleware,
+  validateQuery(PresignedUrlSchema),
+  getPresignedUrlController,
+)
 
 /**
  * @openapi

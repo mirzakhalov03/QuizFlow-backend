@@ -12,39 +12,14 @@ import {
   getQuizzes,
   updateQuizById,
 } from '../services/quiz.service'
-import { QUESTION_TYPES } from '../types/questionTypes'
-import type { QuestionType } from '../types/questionTypes'
-
-type QuizGenerateBody = {
-  s3Url?: string
-  bucket?: string
-  key?: string
-  title?: string
-  userInstructions?: string
-  isTimerEnabled?: boolean
-  timerDuration?: number
-  type?: QuestionType
-}
-
-type PatchQuizBody = {
-  title?: string
-  userInstructions?: string | null
-  isTimerEnabled?: boolean
-  timerDuration?: number | null
-  type?: QuestionType
-}
-
-const isQuestionType = (value: string): value is QuestionType =>
-  QUESTION_TYPES.includes(value as QuestionType)
-
-const DEFAULT_PAGE_LIMIT = 20
+import type { GenerateQuizInput, GetQuizzesQuery, PatchQuizInput } from '../validators/quiz.schema'
 
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
 
     const { s3Url, bucket, key, title, userInstructions, isTimerEnabled, timerDuration, type } =
-      req.body as QuizGenerateBody
+      req.body as GenerateQuizInput
 
     let resolvedBucket = bucket
     let resolvedKey = key
@@ -55,46 +30,22 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       resolvedKey = parsed.key
     }
 
-    if (!resolvedKey) {
-      throw new AppError('key is required', 400, 'VALIDATION_ERROR')
-    }
-
     if (!resolvedBucket) {
-      const fallbackBucket = process.env.AWS_BUCKET_NAME
-      if (!fallbackBucket) {
-        throw new AppError('bucket is required', 400, 'VALIDATION_ERROR')
+      resolvedBucket = process.env.AWS_BUCKET_NAME
+      if (!resolvedBucket) {
+        throw new AppError('AWS_BUCKET_NAME env var is not set', 500, 'INTERNAL_ERROR')
       }
-      resolvedBucket = fallbackBucket
-    }
-
-    const parsedTimerDuration =
-      typeof timerDuration === 'number'
-        ? timerDuration
-        : typeof timerDuration === 'string'
-          ? Number(timerDuration)
-          : undefined
-
-    if (parsedTimerDuration !== undefined && Number.isNaN(parsedTimerDuration)) {
-      throw new AppError('timerDuration must be a number', 400, 'VALIDATION_ERROR')
-    }
-
-    if (isTimerEnabled && !parsedTimerDuration) {
-      throw new AppError('timerDuration is required when timer is enabled', 400, 'VALIDATION_ERROR')
-    }
-
-    if (type && !isQuestionType(type)) {
-      throw new AppError('type must be a valid question type', 400, 'VALIDATION_ERROR')
     }
 
     // Returns the jobId (UUID) — client polls GET /quizzes/jobs/:jobId
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
-      key: resolvedKey,
+      key: resolvedKey!,
       userId,
       title,
       userInstructions,
       isTimerEnabled: Boolean(isTimerEnabled),
-      timerDuration: parsedTimerDuration,
+      timerDuration,
       type,
     })
 
@@ -134,20 +85,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : DEFAULT_PAGE_LIMIT
-    const offset = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
-    const search =
-      typeof req.query.search === 'string' && req.query.search.trim()
-        ? req.query.search.trim()
-        : undefined
-
-    if (Number.isNaN(limit) || limit <= 0 || limit > 100) {
-      throw new AppError('limit must be a number between 1 and 100', 400, 'VALIDATION_ERROR')
-    }
-
-    if (Number.isNaN(offset) || offset < 0) {
-      throw new AppError('offset must be a non-negative number', 400, 'VALIDATION_ERROR')
-    }
+    const { limit, offset, search } = req.query as unknown as GetQuizzesQuery
 
     const { items, total } = await getQuizzes({ userId, limit, offset, search })
 
@@ -193,51 +131,17 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
 
-    const body = req.body as PatchQuizBody
-
-    const hasAnyField =
-      body.title !== undefined ||
-      body.userInstructions !== undefined ||
-      body.isTimerEnabled !== undefined ||
-      body.timerDuration !== undefined ||
-      body.type !== undefined
-
-    if (!hasAnyField) {
-      throw new AppError('At least one updatable field is required', 400, 'VALIDATION_ERROR')
-    }
-
-    const parsedTimerDuration =
-      typeof body.timerDuration === 'number'
-        ? body.timerDuration
-        : typeof body.timerDuration === 'string'
-          ? Number(body.timerDuration)
-          : body.timerDuration
-
-    if (parsedTimerDuration !== undefined && parsedTimerDuration !== null) {
-      if (Number.isNaN(parsedTimerDuration) || parsedTimerDuration <= 0) {
-        throw new AppError('timerDuration must be a positive number', 400, 'VALIDATION_ERROR')
-      }
-    }
-
-    if (
-      body.isTimerEnabled === true &&
-      (parsedTimerDuration === undefined || parsedTimerDuration === null)
-    ) {
-      throw new AppError('timerDuration is required when timer is enabled', 400, 'VALIDATION_ERROR')
-    }
-
-    if (body.type && !isQuestionType(body.type)) {
-      throw new AppError('type must be a valid question type', 400, 'VALIDATION_ERROR')
-    }
+    const { title, userInstructions, isTimerEnabled, timerDuration, type } =
+      req.body as PatchQuizInput
 
     const updatedQuiz = await updateQuizById(
       id,
       {
-        title: body.title,
-        userInstructions: body.userInstructions,
-        isTimerEnabled: body.isTimerEnabled,
-        timerDuration: body.isTimerEnabled === false ? null : (parsedTimerDuration ?? undefined),
-        type: body.type,
+        title,
+        userInstructions,
+        isTimerEnabled,
+        timerDuration: isTimerEnabled === false ? null : (timerDuration ?? undefined),
+        type,
       },
       userId,
     )
