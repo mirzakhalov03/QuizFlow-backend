@@ -2,6 +2,7 @@ import type { Readable } from 'stream'
 
 import type { QuestionType } from '../../types/questionTypes'
 
+/** Maximum file size allowed to be read from S3 for quiz generation (25 MB) */
 export const QUIZ_FILE_MAX_BYTES = 25 * 1024 * 1024
 
 export const streamToString = async (stream: Readable, maxBytes?: number) => {
@@ -23,9 +24,4 @@ export const normalizeQuestionType = (value: string | undefined): QuestionType =
   if (normalized === 'multiple_choice' || normalized === 'multi_select') return normalized
   if (normalized === 'true_false' || normalized === 'true/false') return 'true_false'
   return 'open_ended'
-}
-
-export const normalizeCorrectList = (value: string | string[] | undefined) => {
-  if (!value) return []
-  return Array.isArray(value) ? value.map((item) => item.trim()) : [value.trim()]
 }
