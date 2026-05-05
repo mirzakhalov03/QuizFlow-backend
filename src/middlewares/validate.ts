@@ -1,10 +1,11 @@
 import type { NextFunction, Request, Response } from 'express'
 import type { ZodTypeAny } from 'zod'
 
-export const validate =
+const createValidator =
+  (property: 'body' | 'query') =>
   (schema: ZodTypeAny) =>
   (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body)
+    const result = schema.safeParse(req[property])
 
     if (!result.success) {
       const flattened = result.error.flatten()
@@ -19,30 +20,9 @@ export const validate =
       return
     }
 
-    req.body = result.data
+    req[property] = result.data
     next()
   }
 
-export const validateQuery =
-  (schema: ZodTypeAny) =>
-  (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.query)
-
-    if (!result.success) {
-      const flattened = result.error.flatten()
-      res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: {
-          formErrors: flattened.formErrors,
-          fieldErrors: flattened.fieldErrors,
-        },
-      })
-      return
-    }
-
-    // @ts-expect-error — Express types req.query as ParsedQs; we replace with the
-    // validated plain object, which is safe because our schemas only produce strings.
-    req.query = result.data
-    next()
-  }
+export const validate = createValidator('body')
+export const validateQuery = createValidator('query')

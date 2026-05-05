@@ -6,8 +6,11 @@ const QuestionTypeEnum = z.enum(QUESTION_TYPES)
 
 export const GenerateQuizSchema = z
   .object({
-    /** Full S3 URL (s3://bucket/key). Takes precedence over `bucket`+`key`. */
-    s3Url: z.string().url({ message: 'Must be a valid URL' }).optional(),
+    /** Full S3 URL (s3://bucket/key) or standard AWS HTTPS URL. Takes precedence over `bucket`+`key`. */
+    s3Url: z
+      .string()
+      .regex(/^(s3|https?):\/\/.+/, { message: 'Must be a valid S3 or HTTP(S) URL' })
+      .optional(),
 
     /** S3 bucket name. Required when `s3Url` is not provided. */
     bucket: z.string().min(1, 'bucket must not be empty').optional(),
