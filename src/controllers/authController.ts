@@ -1,5 +1,6 @@
 import { eq, sql, and } from 'drizzle-orm'
 import { Request, Response } from 'express'
+import jwt from 'jsonwebtoken'
 
 import { db } from '../database/database'
 import { users } from '../database/schema'
@@ -25,6 +26,11 @@ const logoutUser = (req: Request, res: Response) => {
       secure: false,
       sameSite: 'lax',
     })
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    })
 
     return res.status(200).json({ message: 'Logged out successfully' })
   } catch (error) {
@@ -35,8 +41,6 @@ const logoutUser = (req: Request, res: Response) => {
 /*-- Google OAuth2 Flow--*/
 
 const redirectUser = async (req: Request, res: Response) => {
-  await db.execute(sql`SELECT 1`)
-  console.log(process.env.DATABASE_URL)
   const googleAuthUrl =
     'https://accounts.google.com/o/oauth2/v2/auth' +
     '?client_id=' +
@@ -133,8 +137,7 @@ const googleCallback = async (req: Request, res: Response) => {
       secure: false,
       sameSite: 'lax',
     })
-
-    return res.redirect('http://localhost:5173/auth/success')
+    return res.redirect('http://localhost:5173/')
   } catch (error) {
     console.error(error)
     return res.status(500).json({ message: 'Internal server error' })
@@ -204,9 +207,8 @@ const notionCallback = async (req: AuthRequest, res: Response) => {
         .update(userIntegrations)
         .set({
           accessToken: data.access_token,
-          updatedAt: new Date(),
         })
-        .where(eq(userIntegrations.userId, user.id))
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'notion')))
     }
 
     return res.redirect('http://localhost:5173/integrations/success')
@@ -215,4 +217,32 @@ const notionCallback = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
-export { logoutUser, redirectUser, googleCallback, redirectToNotion, notionCallback }
+/*-- Refresh Token Flow--*/
+type JwtPayloadUser = {
+  id: string
+}
+const refreshToken = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token' })
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!) as JwtPayloadUser
+
+    const newAccessToken = jwt.sign({ id: decoded.id }, process.env.ACCESS_TOKEN_SECRET!, {
+      expiresIn: '15m',
+    })
+
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      sameSite: 'strict',
+    })
+
+    return res.json({ message: 'Token refreshed' })
+  } catch {
+    return res.status(401).json({ message: 'Invalid refresh token' })
+  }
+}
+export { logoutUser, redirectUser, googleCallback, redirectToNotion, notionCallback, refreshToken }
