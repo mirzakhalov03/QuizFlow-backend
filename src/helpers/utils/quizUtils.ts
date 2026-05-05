@@ -4,6 +4,7 @@ import { AppError } from '../AppError'
  * Parses an S3 object URL into { bucket, key }.
  *
  * Supports:
+ *  - S3 Protocol:     s3://<bucket>/<key>
  *  - Virtual-hosted:  https://<bucket>.s3.<region>.amazonaws.com/<key>
  *  - Path-style:      https://s3.<region>.amazonaws.com/<bucket>/<key>
  *  - Accelerated:     https://<bucket>.s3-accelerate.amazonaws.com/<key>
@@ -14,6 +15,18 @@ export const parseS3Url = (url: string): { bucket: string; key: string } => {
     parsed = new URL(url)
   } catch {
     throw new AppError('Invalid s3Url format', 400, 'VALIDATION_ERROR')
+  }
+
+  // S3 Protocol: s3://<bucket>/<key>
+  if (parsed.protocol === 's3:') {
+    const bucket = parsed.hostname
+    const key = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+
+    if (!bucket || !key) {
+      throw new AppError('s3Url must include bucket and key', 400, 'VALIDATION_ERROR')
+    }
+
+    return { bucket, key }
   }
 
   const hostname = parsed.hostname
@@ -46,7 +59,7 @@ export const parseS3Url = (url: string): { bucket: string; key: string } => {
   }
 
   throw new AppError(
-    'Unrecognized S3 URL format. Expected virtual-hosted or path-style amazonaws.com URL.',
+    'Unrecognized S3 URL format. Expected s3://, virtual-hosted, or path-style amazonaws.com URL.',
     400,
     'VALIDATION_ERROR',
   )
