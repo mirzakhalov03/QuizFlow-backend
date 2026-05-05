@@ -7,6 +7,14 @@ import { AppError } from '../AppError'
 
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
 
+export const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'application/msword', // .doc
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+]
+
 export type MulterRequest = Request & { file?: Express.Multer.File; files?: Express.Multer.File[] }
 
 const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '-')
@@ -14,17 +22,6 @@ const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '-')
 export const buildS3Key = (file: Express.Multer.File) => {
   const safeName = sanitizeFileName(file.originalname || 'upload')
   return `uploads/${randomUUID()}-${safeName}`
-}
-
-export const getFirstUploadedFile = (req: Request) => {
-  const { file, files } = req as MulterRequest
-  const resolvedFile = file ?? files?.[0]
-
-  if (!resolvedFile) {
-    throw new AppError('File is required', 400, 'VALIDATION_ERROR')
-  }
-
-  return resolvedFile
 }
 
 export const getUploadedFiles = (req: Request) => {

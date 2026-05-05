@@ -2,9 +2,16 @@ import type { Request, Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
+import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
-import { deleteQuizById, getQuizById, getQuizzes, updateQuizById } from '../services/quiz.service'
+import {
+  deleteQuizById,
+  getJobById,
+  getQuizById,
+  getQuizzes,
+  updateQuizById,
+} from '../services/quiz.service'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
 
@@ -12,7 +19,6 @@ type QuizGenerateBody = {
   s3Url?: string
   bucket?: string
   key?: string
-  userId?: string
   title?: string
   userInstructions?: string
   isTimerEnabled?: boolean
@@ -31,23 +37,14 @@ type PatchQuizBody = {
 const isQuestionType = (value: string): value is QuestionType =>
   QUESTION_TYPES.includes(value as QuestionType)
 
+const DEFAULT_PAGE_LIMIT = 20
+
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const {
-      s3Url,
-      bucket,
-      key,
-      userId,
-      title,
-      userInstructions,
-      isTimerEnabled,
-      timerDuration,
-      type,
-    } = req.body as QuizGenerateBody
+    const userId = getAuthUserId(req)
 
-    if (!userId) {
-      throw new AppError('userId is required', 400, 'VALIDATION_ERROR')
-    }
+    const { s3Url, bucket, key, title, userInstructions, isTimerEnabled, timerDuration, type } =
+      req.body as QuizGenerateBody
 
     let resolvedBucket = bucket
     let resolvedKey = key
@@ -89,7 +86,8 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       throw new AppError('type must be a valid question type', 400, 'VALIDATION_ERROR')
     }
 
-    const requestId = await invokeQuizGenerator({
+    // Returns the jobId (UUID) — client polls GET /quizzes/jobs/:jobId
+    const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       key: resolvedKey,
       userId,
@@ -102,7 +100,8 @@ export const generateQuizController = async (req: Request, res: Response, next: 
 
     res.status(202).json(
       successResponse('Quiz generation started', {
-        requestId,
+        jobId,
+        pollUrl: `/quizzes/jobs/${jobId}`,
       }),
     )
   } catch (error) {
@@ -110,11 +109,37 @@ export const generateQuizController = async (req: Request, res: Response, next: 
   }
 }
 
+export const getJobStatusController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+
+    const rawJobId = req.params.jobId
+    const jobId = typeof rawJobId === 'string' ? rawJobId : rawJobId?.[0]
+    if (!jobId) {
+      throw new AppError('jobId is required', 400, 'VALIDATION_ERROR')
+    }
+
+    const job = await getJobById(jobId, userId)
+    if (!job) {
+      throw new AppError('Job not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Job status retrieved', job))
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const getQuizzesController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined
-    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20
+    const userId = getAuthUserId(req)
+
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : DEFAULT_PAGE_LIMIT
     const offset = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
+    const search =
+      typeof req.query.search === 'string' && req.query.search.trim()
+        ? req.query.search.trim()
+        : undefined
 
     if (Number.isNaN(limit) || limit <= 0 || limit > 100) {
       throw new AppError('limit must be a number between 1 and 100', 400, 'VALIDATION_ERROR')
@@ -124,7 +149,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
       throw new AppError('offset must be a non-negative number', 400, 'VALIDATION_ERROR')
     }
 
-    const { items, total } = await getQuizzes({ userId, limit, offset })
+    const { items, total } = await getQuizzes({ userId, limit, offset, search })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {
@@ -139,12 +164,13 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
 
 export const getQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const userId = getAuthUserId(req)
+
     const rawId = req.params.id
-    if (typeof rawId !== 'string') {
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
-    const id = rawId
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined
 
     const quiz = await getQuizById(id, userId)
     if (!quiz) {
@@ -159,12 +185,14 @@ export const getQuizByIdController = async (req: Request, res: Response, next: N
 
 export const patchQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const userId = getAuthUserId(req)
+
     const rawId = req.params.id
-    if (typeof rawId !== 'string') {
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
-    const id = rawId
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined
+
     const body = req.body as PatchQuizBody
 
     const hasAnyField =
@@ -226,12 +254,13 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
 
 export const deleteQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const userId = getAuthUserId(req)
+
     const rawId = req.params.id
-    if (typeof rawId !== 'string') {
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
-    const id = rawId
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined
 
     const deleted = await deleteQuizById(id, userId)
     if (!deleted) {
