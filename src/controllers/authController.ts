@@ -137,7 +137,7 @@ const googleCallback = async (req: Request, res: Response) => {
       secure: false,
       sameSite: 'lax',
     })
-    return res.redirect('http://localhost:5173/')
+    return res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173/')
   } catch (error) {
     console.error(error)
     return res.status(500).json({ message: 'Internal server error' })
