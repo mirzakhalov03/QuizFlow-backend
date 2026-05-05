@@ -6,6 +6,7 @@ import {
   googleCallback,
   notionCallback,
   redirectToNotion,
+  refreshToken,
 } from '../controllers/authController'
 import { authMiddleware } from '../middlewares/authMiddleware'
 import { AuthRequest } from '../middlewares/authMiddleware'
@@ -19,4 +20,5 @@ router.post('/logout', logoutUser)
 router.get('/me', authMiddleware, (req: AuthRequest, res: express.Response) => {
   return res.json(req.user)
 })
+router.post('/refresh', refreshToken)
 export default router

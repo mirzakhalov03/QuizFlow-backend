@@ -73,10 +73,17 @@ const googleCallback = async (req: Request, res: Response) => {
       }),
     })
 
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text().catch(() => '')
+      console.error('Google token exchange failed:', errorText)
+
+      return res.status(400).json({ message: 'Failed to exchange Google auth code' })
+    }
+
     const tokens = await tokenResponse.json()
 
-    if (!tokenResponse.ok) {
-      return res.status(400).json({ message: 'Failed to exchange Google auth code' })
+    if (!tokens?.access_token) {
+      return res.status(400).json({ message: 'No access token received' })
     }
 
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -85,7 +92,18 @@ const googleCallback = async (req: Request, res: Response) => {
       },
     })
 
+    if (!userInfoResponse.ok) {
+      const errorText = await userInfoResponse.text().catch(() => '')
+      console.error('Google user info failed:', errorText)
+
+      return res.status(400).json({ message: 'Failed to fetch Google user info' })
+    }
+
     const profile = await userInfoResponse.json()
+
+    if (!profile?.email) {
+      return res.status(400).json({ message: 'Google profile missing email' })
+    }
 
     const existingUser = await User.findByEmail(profile.email)
 
@@ -141,9 +159,10 @@ const googleCallback = async (req: Request, res: Response) => {
       secure: false,
       sameSite: 'lax',
     })
+
     return res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173/')
   } catch (error) {
-    console.error(error)
+    console.error('Google callback error:', error)
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
@@ -241,7 +260,7 @@ const refreshToken = async (req: Request, res: Response) => {
 
     res.cookie('accessToken', newAccessToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
     })
 
     return res.json({ message: 'Token refreshed' })
