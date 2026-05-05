@@ -14,6 +14,8 @@ import {
 
 import { QUESTION_TYPES } from '../types/questionTypes'
 
+export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   fullName: text('full_name').notNull(),
@@ -179,6 +181,29 @@ export const quizResults = pgTable(
   }),
 )
 
+export const quizJobs = pgTable(
+  'quiz_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    quizId: uuid('quiz_id').references(() => quizzes.id, { onDelete: 'set null' }),
+    status: jobStatusEnum('status').notNull().default('pending'),
+    requestId: text('request_id'),
+    error: text('error'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('quiz_jobs_user_id_idx').on(table.userId),
+    statusIdx: index('quiz_jobs_status_idx').on(table.status),
+  }),
+)
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
@@ -189,6 +214,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   quizzes: many(quizzes),
   answers: many(userAnswers),
   quizResults: many(quizResults),
+  quizJobs: many(quizJobs),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -260,6 +286,17 @@ export const quizResultsRelations = relations(quizResults, ({ one }) => ({
   }),
   quiz: one(quizzes, {
     fields: [quizResults.quizId],
+    references: [quizzes.id],
+  }),
+}))
+
+export const quizJobsRelations = relations(quizJobs, ({ one }) => ({
+  user: one(users, {
+    fields: [quizJobs.userId],
+    references: [users.id],
+  }),
+  quiz: one(quizzes, {
+    fields: [quizJobs.quizId],
     references: [quizzes.id],
   }),
 }))

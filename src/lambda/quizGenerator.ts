@@ -1,38 +1,24 @@
 import type { Readable } from 'stream'
 
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { eq } from 'drizzle-orm'
 
-import { db } from '../database/database'
-import { questionOptions, questions, quizzes } from '../database/schema'
+import { getLambdaDb } from './dbClient'
+import { s3Client } from './s3Client'
+import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
-  normalizeCorrectList,
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
   streamToString,
 } from '../helpers/utils/quizLambdaUtils'
+import { generateQuizFromText } from '../services/quizAi'
+import type { AiQuiz } from '../services/quizAi'
 import type { QuestionType } from '../types/questionTypes'
 
-const { AWS_REGION } = process.env
-
-type QuizQuestion = {
-  type: QuestionType
-  text: string
-  options?: string[]
-  correct?: string | string[]
-}
-
-type QuizPayload = {
-  id: string
-  title: string
-  questions: QuizQuestion[]
-  metadata: {
-    purpose?: string
-    duration_est?: number
-  }
-  created_at: string
-}
+// Lambda-local clients — no Express app dependencies, no credential env vars required
 
 type LambdaEvent = {
+  jobId: string
   bucket: string
   key: string
   userId: string
@@ -41,24 +27,20 @@ type LambdaEvent = {
   isTimerEnabled?: boolean
   timerDuration?: number
   type?: string
-  quiz?: QuizPayload
+  questionCount?: number
+  quiz?: AiQuiz
 }
-
-if (!AWS_REGION) {
-  throw new Error('AWS_REGION is not defined')
-}
-
-const s3Client = new S3Client({ region: AWS_REGION })
 
 const persistQuiz = async (
-  payload: QuizPayload,
+  payload: AiQuiz,
   event: LambdaEvent,
   source: { bucket: string; key: string },
 ) => {
-  const metadata = payload.metadata ?? {}
+  const db = await getLambdaDb()
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
+    // ── Insert 1: quiz row ──────────────────────────────────────────────────
     const [quizRow] = await tx
       .insert(quizzes)
       .values({
@@ -66,8 +48,8 @@ const persistQuiz = async (
         userId: event.userId,
         type: event.type ? normalizeQuestionType(event.type) : undefined,
         properties: {
-          metadata,
           source,
+          generatedBy: 'openrouter',
         },
         isTimerEnabled: Boolean(event.isTimerEnabled),
         timerDuration: event.isTimerEnabled ? (event.timerDuration ?? null) : null,
@@ -76,33 +58,37 @@ const persistQuiz = async (
       })
       .returning({ id: quizzes.id })
 
-    for (const [index, question] of questionsList.entries()) {
-      const [questionRow] = await tx
-        .insert(questions)
-        .values({
+    if (questionsList.length === 0) return quizRow
+
+    // ── Insert 2: all questions in a single statement ───────────────────────
+    // Drizzle guarantees .returning() rows are in the same order as .values(),
+    // so questionRows[i].id safely corresponds to questionsList[i].
+    const questionRows = await tx
+      .insert(questions)
+      .values(
+        questionsList.map((question, index) => ({
           quizId: quizRow.id,
           text: question.text,
-          type: normalizeQuestionType(question.type),
+          type: normalizeQuestionType(question.type) as QuestionType,
           position: index + 1,
-        })
-        .returning({ id: questions.id })
+        })),
+      )
+      .returning({ id: questions.id })
 
-      const options = question.options ?? []
-      if (options.length === 0) {
-        continue
-      }
-
-      const correctList = normalizeCorrectList(question.correct)
-
-      const optionRows = options.map((optionText, optionIndex) => ({
-        questionId: questionRow.id,
-        text: optionText,
-        explanation: null,
-        isCorrect: correctList.includes(optionText.trim()),
+    // ── Insert 3: all options for all questions in a single statement ────────
+    const allOptionValues = questionsList.flatMap((question, index) => {
+      const options = Array.isArray(question.options) ? question.options : []
+      return options.map((option, optionIndex) => ({
+        questionId: questionRows[index].id,
+        text: option.text,
+        explanation: option.explanation ?? null,
+        isCorrect: Boolean(option.isCorrect),
         position: optionIndex + 1,
       }))
+    })
 
-      await tx.insert(questionOptions).values(optionRows)
+    if (allOptionValues.length > 0) {
+      await tx.insert(questionOptions).values(allOptionValues)
     }
 
     return quizRow
@@ -111,44 +97,60 @@ const persistQuiz = async (
   return quizInsert
 }
 
-export const handler = async (event: LambdaEvent) => {
-  if (!event?.bucket || !event?.key || !event?.userId) {
-    throw new Error('bucket, key, and userId are required')
-  }
-
-  const s3Response = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: event.bucket,
-      Key: event.key,
-    }),
-  )
+const fetchSourceText = async (bucket: string, key: string): Promise<string> => {
+  const s3Response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
 
   if (!s3Response.Body) {
     throw new Error('S3 object has no body')
   }
 
-  const maxBytes = QUIZ_FILE_MAX_BYTES ? Number(QUIZ_FILE_MAX_BYTES) : 5 * 1024 * 1024
-  if (Number.isNaN(maxBytes) || maxBytes <= 0) {
-    throw new Error('QUIZ_FILE_MAX_BYTES must be a positive number')
+  return streamToString(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
+}
+
+export const handler = async (event: LambdaEvent) => {
+  if (!event?.bucket || !event?.key || !event?.userId || !event?.jobId) {
+    throw new Error('bucket, key, userId, and jobId are required')
   }
-  const content = await streamToString(s3Response.Body as Readable, maxBytes)
-  if (event.quiz) {
-    const quizRow = await persistQuiz(event.quiz, event, {
+
+  const db = await getLambdaDb()
+
+  try {
+    const quiz =
+      event.quiz ??
+      (await generateQuizFromText({
+        sourceText: await fetchSourceText(event.bucket, event.key),
+        questionCount: event.questionCount,
+        type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
+        userInstructions: event.userInstructions,
+        defaultTitle: event.title,
+      }))
+
+    const quizRow = await persistQuiz(quiz, event, {
       bucket: event.bucket,
       key: event.key,
     })
 
+    // Update job → done
+    await db
+      .update(quizJobs)
+      .set({ status: 'done', quizId: quizRow.id })
+      .where(eq(quizJobs.id, event.jobId))
+
     return {
       statusCode: 200,
       quizId: quizRow.id,
-      quiz: event.quiz,
+      questionCount: quiz.questions.length,
     }
-  }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[quizGenerator] Failed:', message, err)
 
-  return {
-    statusCode: 200,
-    source: { bucket: event.bucket, key: event.key },
-    contentLength: content.length,
-    contentSample: content.slice(0, 1000),
+    // Update job → failed with error message
+    await db
+      .update(quizJobs)
+      .set({ status: 'failed', error: message })
+      .where(eq(quizJobs.id, event.jobId))
+
+    throw err
   }
 }
