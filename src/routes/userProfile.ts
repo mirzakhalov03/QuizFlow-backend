@@ -1,4 +1,3 @@
-import { getUser } from '@notionhq/client/build/src/api-endpoints'
 import express, { Response } from 'express'
 
 import {
