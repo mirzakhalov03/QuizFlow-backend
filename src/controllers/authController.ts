@@ -75,6 +75,10 @@ const googleCallback = async (req: Request, res: Response) => {
 
     const tokens = await tokenResponse.json()
 
+    if (!tokenResponse.ok) {
+      return res.status(400).json({ message: 'Failed to exchange Google auth code' })
+    }
+
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
         Authorization: `Bearer ${tokens.access_token}`,
