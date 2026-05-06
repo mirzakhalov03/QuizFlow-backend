@@ -3,19 +3,25 @@ import { Router } from 'express'
 import {
   deleteQuizByIdController,
   generateQuizController,
+  getJobStatusController,
   getQuizByIdController,
   getQuizzesController,
   patchQuizByIdController,
 } from '../controllers/quizController'
+import { authMiddleware } from '../middlewares/authMiddleware'
+import { validate, validateQuery } from '../middlewares/validate'
+import { GenerateQuizSchema, GetQuizzesSchema, PatchQuizSchema } from '../validators/quiz.schema'
 
 const router = Router()
 
 /**
  * @openapi
- * /quizzes/generate:
+ * /quizzes:
  *   post:
  *     tags:
  *       - Quiz
+ *     security:
+ *       - cookieAuth: []
  *     summary: Start asynchronous quiz generation job
  *     requestBody:
  *       required: true
@@ -32,8 +38,36 @@ const router = Router()
  *               $ref: '#/components/schemas/ApiSuccessResponse'
  *       400:
  *         description: Validation error
+ *       401:
+ *         description: Not authenticated
  */
-router.post('/quizzes/generate', generateQuizController)
+router.post('/quizzes', authMiddleware, validate(GenerateQuizSchema), generateQuizController)
+
+/**
+ * @openapi
+ * /quizzes/jobs/{jobId}:
+ *   get:
+ *     tags:
+ *       - Quiz
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Poll the status of an async quiz generation job
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job status retrieved
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Job not found
+ */
+router.get('/quizzes/jobs/:jobId', authMiddleware, getJobStatusController)
 
 /**
  * @openapi
@@ -41,13 +75,16 @@ router.post('/quizzes/generate', generateQuizController)
  *   get:
  *     tags:
  *       - Quiz
- *     summary: Retrieve quizzes
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Retrieve quizzes for the authenticated user
  *     parameters:
  *       - in: query
- *         name: userId
+ *         name: search
+ *         description: Case-insensitive substring search on quiz title
  *         schema:
  *           type: string
- *           format: uuid
+ *         example: biology
  *       - in: query
  *         name: limit
  *         schema:
@@ -66,8 +103,10 @@ router.post('/quizzes/generate', generateQuizController)
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ApiSuccessResponse'
+ *       401:
+ *         description: Not authenticated
  */
-router.get('/quizzes', getQuizzesController)
+router.get('/quizzes', authMiddleware, validateQuery(GetQuizzesSchema), getQuizzesController)
 
 /**
  * @openapi
@@ -75,7 +114,9 @@ router.get('/quizzes', getQuizzesController)
  *   get:
  *     tags:
  *       - Quiz
- *     summary: Retrieve quiz by id
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Retrieve quiz by id (includes questions and options)
  *     parameters:
  *       - in: path
  *         name: id
@@ -83,18 +124,15 @@ router.get('/quizzes', getQuizzesController)
  *         schema:
  *           type: string
  *           format: uuid
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *           format: uuid
  *     responses:
  *       200:
  *         description: Quiz retrieved
+ *       401:
+ *         description: Not authenticated
  *       404:
  *         description: Quiz not found
  */
-router.get('/quizzes/:id', getQuizByIdController)
+router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
 
 /**
  * @openapi
@@ -102,16 +140,13 @@ router.get('/quizzes/:id', getQuizByIdController)
  *   patch:
  *     tags:
  *       - Quiz
+ *     security:
+ *       - cookieAuth: []
  *     summary: Update quiz metadata
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: userId
  *         schema:
  *           type: string
  *           format: uuid
@@ -126,10 +161,12 @@ router.get('/quizzes/:id', getQuizByIdController)
  *         description: Quiz updated
  *       400:
  *         description: Validation error
+ *       401:
+ *         description: Not authenticated
  *       404:
  *         description: Quiz not found
  */
-router.patch('/quizzes/:id', patchQuizByIdController)
+router.patch('/quizzes/:id', authMiddleware, validate(PatchQuizSchema), patchQuizByIdController)
 
 /**
  * @openapi
@@ -137,6 +174,8 @@ router.patch('/quizzes/:id', patchQuizByIdController)
  *   delete:
  *     tags:
  *       - Quiz
+ *     security:
+ *       - cookieAuth: []
  *     summary: Delete quiz by id
  *     parameters:
  *       - in: path
@@ -145,17 +184,14 @@ router.patch('/quizzes/:id', patchQuizByIdController)
  *         schema:
  *           type: string
  *           format: uuid
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *           format: uuid
  *     responses:
  *       200:
  *         description: Quiz deleted
+ *       401:
+ *         description: Not authenticated
  *       404:
  *         description: Quiz not found
  */
-router.delete('/quizzes/:id', deleteQuizByIdController)
+router.delete('/quizzes/:id', authMiddleware, deleteQuizByIdController)
 
 export default router

@@ -1,6 +1,6 @@
 {
-  "id": "4ff9e193-2963-44d9-8f27-6dc0ad630f84",
-  "prevId": "eff21e9b-9319-4b0a-871f-b228996ec386",
+  "id": "f34ac7c7-cbc5-44e0-b080-fead19b38d5a",
+  "prevId": "4b44e6fd-91fb-42bf-8c94-993f4b3067fa",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -139,6 +139,122 @@
           "columnsFrom": ["quiz_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quiz_jobs": {
+      "name": "quiz_jobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quiz_id": {
+          "name": "quiz_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "job_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "quiz_jobs_user_id_idx": {
+          "name": "quiz_jobs_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "quiz_jobs_status_idx": {
+          "name": "quiz_jobs_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "quiz_jobs_user_id_users_id_fk": {
+          "name": "quiz_jobs_user_id_users_id_fk",
+          "tableFrom": "quiz_jobs",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "quiz_jobs_quiz_id_quizzes_id_fk": {
+          "name": "quiz_jobs_quiz_id_quizzes_id_fk",
+          "tableFrom": "quiz_jobs",
+          "tableTo": "quizzes",
+          "columnsFrom": ["quiz_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -314,12 +430,6 @@
         "timer_duration": {
           "name": "timer_duration",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "complete_by": {
-          "name": "complete_by",
-          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -760,10 +870,15 @@
     }
   },
   "enums": {
+    "public.job_status": {
+      "name": "job_status",
+      "schema": "public",
+      "values": ["pending", "done", "failed"]
+    },
     "public.question_type": {
       "name": "question_type",
       "schema": "public",
-      "values": ["single_choice", "multiple_choice", "text", "true_false"]
+      "values": ["multiple_choice", "multi_select", "open_ended", "true_false"]
     }
   },
   "schemas": {},
