@@ -9,8 +9,8 @@ import { authMiddleware } from '../middlewares/authMiddleware'
 
 const router = express.Router()
 
-router.get('/me', authMiddleware, getUserProfile)
-router.put('/me', authMiddleware, updateUserProfile)
-router.delete('/me', authMiddleware, deleteUserProfile)
+router.get('/userProfile/me', authMiddleware, getUserProfile)
+router.put('/userProfile/me', authMiddleware, updateUserProfile)
+router.delete('/userProfile/me', authMiddleware, deleteUserProfile)
 
 export default router

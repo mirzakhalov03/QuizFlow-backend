@@ -8,11 +8,11 @@ import { swaggerSpec } from './config/swagger'
 import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
-import authRoutes from './routes/auth'
+import authRoutes from './routes/auth.routes'
 import healthRoutes from './routes/health.routes'
 import quizRoutes from './routes/quiz.routes'
 import uploadRoutes from './routes/upload.routes'
-import userProfileRoutes from './routes/userProfile'
+import userProfileRoutes from './routes/userProfile.routes'
 
 const app = express()
 
@@ -29,8 +29,8 @@ app.use(
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
-app.use('/auth', authRoutes)
-app.use('/userProfile', userProfileRoutes)
+app.use(authRoutes)
+app.use(userProfileRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
