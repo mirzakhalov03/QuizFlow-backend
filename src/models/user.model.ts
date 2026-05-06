@@ -60,4 +60,21 @@ export default class User {
       userRow.refreshToken,
     )
   }
+  static async findById(id: string): Promise<User | null> {
+    const userRow = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .then((rows) => rows[0])
+    if (!userRow) return null
+
+    return new User(
+      userRow.id,
+      userRow.email,
+      userRow.fullName,
+      userRow.createdAt,
+      userRow.updatedAt,
+      userRow.refreshToken,
+    )
+  }
 }
