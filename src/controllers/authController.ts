@@ -1,5 +1,6 @@
 import { eq, sql, and } from 'drizzle-orm'
 import { Request, Response } from 'express'
+import jwt from 'jsonwebtoken'
 
 import { db } from '../database/database'
 import { users } from '../database/schema'
@@ -25,9 +26,14 @@ const logoutUser = (req: Request, res: Response) => {
       secure: false,
       sameSite: 'lax',
     })
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    })
 
     return res.status(200).json({ message: 'Logged out successfully' })
-  } catch (_error) {
+  } catch (error) {
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
@@ -35,8 +41,6 @@ const logoutUser = (req: Request, res: Response) => {
 /*-- Google OAuth2 Flow--*/
 
 const redirectUser = async (req: Request, res: Response) => {
-  await db.execute(sql`SELECT 1`)
-  console.log(process.env.DATABASE_URL)
   const googleAuthUrl =
     'https://accounts.google.com/o/oauth2/v2/auth' +
     '?client_id=' +
@@ -69,7 +73,18 @@ const googleCallback = async (req: Request, res: Response) => {
       }),
     })
 
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text().catch(() => '')
+      console.error('Google token exchange failed:', errorText)
+
+      return res.status(400).json({ message: 'Failed to exchange Google auth code' })
+    }
+
     const tokens = await tokenResponse.json()
+
+    if (!tokens?.access_token) {
+      return res.status(400).json({ message: 'No access token received' })
+    }
 
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
@@ -77,7 +92,18 @@ const googleCallback = async (req: Request, res: Response) => {
       },
     })
 
+    if (!userInfoResponse.ok) {
+      const errorText = await userInfoResponse.text().catch(() => '')
+      console.error('Google user info failed:', errorText)
+
+      return res.status(400).json({ message: 'Failed to fetch Google user info' })
+    }
+
     const profile = await userInfoResponse.json()
+
+    if (!profile?.email) {
+      return res.status(400).json({ message: 'Google profile missing email' })
+    }
 
     const existingUser = await User.findByEmail(profile.email)
 
@@ -134,9 +160,9 @@ const googleCallback = async (req: Request, res: Response) => {
       sameSite: 'lax',
     })
 
-    return res.redirect('http://localhost:5173/auth/success')
+    return res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173/')
   } catch (error) {
-    console.error(error)
+    console.error('Google callback error:', error)
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
@@ -214,4 +240,32 @@ const notionCallback = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
-export { logoutUser, redirectUser, googleCallback, redirectToNotion, notionCallback }
+/*-- Refresh Token Flow--*/
+type JwtPayloadUser = {
+  id: string
+}
+const refreshToken = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token' })
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!) as JwtPayloadUser
+
+    const newAccessToken = jwt.sign({ id: decoded.id }, process.env.ACCESS_TOKEN_SECRET!, {
+      expiresIn: '15m',
+    })
+
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+    })
+
+    return res.json({ message: 'Token refreshed' })
+  } catch {
+    return res.status(401).json({ message: 'Invalid refresh token' })
+  }
+}
+export { logoutUser, redirectUser, googleCallback, redirectToNotion, notionCallback, refreshToken }
