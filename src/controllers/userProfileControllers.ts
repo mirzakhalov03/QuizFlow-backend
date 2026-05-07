@@ -46,12 +46,11 @@ export const updateUser = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const userId = req.user!.id
 
-    const { email, fullName, refreshToken } = req.body
+    const { email, fullName } = req.body
 
     const updatedUser = await User.updateUser(userId, {
       email,
       fullName,
-      refreshToken,
     })
 
     if (!updatedUser) {
@@ -65,7 +64,7 @@ export const updateUser = async (req: AuthRequest, res: Response, next: NextFunc
     next(error)
   }
 }
-export const uploadProfilePicture = async (req: AuthRequest, res: Response) => {
+export const uploadProfilePicture = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const userId = req.user?.id
 
   if (!userId) {
@@ -73,13 +72,16 @@ export const uploadProfilePicture = async (req: AuthRequest, res: Response) => {
   }
 
   const file = req.file
+  try {
+    const updatedProfile = await UserProfileImageService.uploadProfileImage(
+      userId,
+      file as Express.Multer.File,
+    )
 
-  const updatedProfile = await UserProfileImageService.uploadProfileImage(
-    userId,
-    file as Express.Multer.File,
-  )
-
-  return res
-    .status(200)
-    .json(successResponse('Profile picture updated successfully', updatedProfile))
+    return res
+      .status(200)
+      .json(successResponse('Profile picture updated successfully', updatedProfile))
+  } catch (error) {
+    next(error)
+  }
 }

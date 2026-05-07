@@ -70,6 +70,7 @@ class AuthService {
         grant_type: 'authorization_code',
       }),
     })
+    if (!res.ok) throw new Error('Failed to exchange code for token:' + (await res.text()))
 
     return await res.json()
   }
