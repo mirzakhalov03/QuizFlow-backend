@@ -50,6 +50,20 @@
       "when": 1777792480993,
       "tag": "0006_aspiring_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778076282953,
+      "tag": "0007_acoustic_darkstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778076437647,
+      "tag": "0008_foamy_vertigo",
+      "breakpoints": true
     }
   ]
 }

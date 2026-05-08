@@ -1,9 +1,12 @@
-import { Response } from 'express'
+import { NextFunction, Response } from 'express'
 
+import { successResponse } from '../helpers/apiResponse'
 import { AuthRequest } from '../middlewares/authMiddleware'
+import User from '../models/user.model'
 import userProfile from '../models/userProfile.model'
+import UserProfileImageService from '../services/userProfileImageService'
 
-export const getUserProfile = async (req: AuthRequest, res: Response) => {
+export const getUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const profile = await userProfile.findByUserId(req.user!.id)
 
@@ -12,29 +15,73 @@ export const getUserProfile = async (req: AuthRequest, res: Response) => {
     }
 
     return res.json(profile)
-  } catch {
-    return res.status(500).json({ message: 'Server error' })
+  } catch (error) {
+    next(error)
   }
 }
 
-export const updateUserProfile = async (req: AuthRequest, res: Response) => {
+export const updateUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { bio, profilePicture } = req.body
 
     const updated = await userProfile.upsert(req.user!.id, bio ?? null, profilePicture ?? null)
 
     return res.json(updated)
-  } catch {
-    return res.status(500).json({ message: 'Server error' })
+  } catch (error) {
+    next(error)
   }
 }
 
-export const deleteUserProfile = async (req: AuthRequest, res: Response) => {
+export const deleteUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await userProfile.deleteByUserId(req.user!.id)
 
     return res.json({ message: 'Profile deleted' })
-  } catch {
-    return res.status(500).json({ message: 'Server error' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const updateUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+
+    const { email, fullName } = req.body
+
+    const updatedUser = await User.updateUser(userId, {
+      email,
+      fullName,
+    })
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        message: 'User not found',
+      })
+    }
+
+    return res.status(200).json(updatedUser)
+  } catch (error) {
+    next(error)
+  }
+}
+export const uploadProfilePicture = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const userId = req.user?.id
+
+  if (!userId) {
+    throw new Error('Unauthorized')
+  }
+
+  const file = req.file
+  try {
+    const updatedProfile = await UserProfileImageService.uploadProfileImage(
+      userId,
+      file as Express.Multer.File,
+    )
+
+    return res
+      .status(200)
+      .json(successResponse('Profile picture updated successfully', updatedProfile))
+  } catch (error) {
+    next(error)
   }
 }
