@@ -77,4 +77,32 @@ export default class User {
       userRow.refreshToken,
     )
   }
+  static async updateUser(
+    id: string,
+    data: {
+      email?: string
+      fullName?: string
+      refreshToken?: string | null
+    },
+  ): Promise<User | null> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning()
+
+    if (!updated) return null
+
+    return new User(
+      updated.id,
+      updated.email,
+      updated.fullName,
+      updated.createdAt,
+      updated.updatedAt,
+      updated.refreshToken,
+    )
+  }
 }

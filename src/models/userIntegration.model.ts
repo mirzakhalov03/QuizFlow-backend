@@ -67,4 +67,20 @@ export default class UserIntegrations {
       row.updatedAt,
     )
   }
+  static async updateByUserIdAndProvider(
+    userId: string,
+    provider: string,
+    data: {
+      accessToken?: string
+      refreshToken?: string
+    },
+  ): Promise<void> {
+    await db
+      .update(userIntegrations)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, provider)))
+  }
 }
