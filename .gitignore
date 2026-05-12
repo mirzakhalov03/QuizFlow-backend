@@ -16,6 +16,7 @@ dist-ssr
 bin
 progress.md
 claude.md
+scripts
 
 # Editor directories and files
 .vscode/*
