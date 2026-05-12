@@ -7,6 +7,10 @@ export const errorHandler = (err: unknown, _req: Request, res: Response, _next: 
   const isOperationalError = err instanceof AppError
   const isProduction = process.env.NODE_ENV === 'production'
 
+  if (!isProduction && err instanceof Error) {
+    console.error(err)
+  }
+
   const statusCode = isOperationalError ? err.statusCode : 500
   const message =
     isOperationalError || !isProduction

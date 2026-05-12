@@ -2,7 +2,7 @@ import { chatJSON } from './openRouter'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
 
-const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.0-flash-exp:free'
+const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.0-flash-001'
 const SOURCE_TEXT_LIMIT = 50_000
 const DEFAULT_QUESTION_COUNT = 5
 
