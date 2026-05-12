@@ -1,9 +1,20 @@
-import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-import { s3BucketName, s3Client, s3Region } from './s3Client'
+import { s3BucketName, s3Region } from './s3Client'
 import { AppError } from '../helpers/AppError'
 import { buildS3ObjectUrl } from '../helpers/utils/uploadUtils'
+
+// SDK v3 adds CRC32 checksums by default — browser fetch can't compute them.
+// This client disables automatic checksum injection so the presigned URL stays browser-safe.
+const presignClient = new S3Client({
+  region: s3Region,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+  },
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+})
 
 /** Pre-signed URL is valid for 5 minutes. Short enough to prevent sharing, long enough for any upload. */
 const PRESIGNED_URL_EXPIRES_IN_SECONDS = 300
@@ -33,7 +44,7 @@ export const createPresignedUploadUrl = async (
 
   let uploadUrl: string
   try {
-    uploadUrl = await getSignedUrl(s3Client, command, {
+    uploadUrl = await getSignedUrl(presignClient, command, {
       expiresIn: PRESIGNED_URL_EXPIRES_IN_SECONDS,
     })
   } catch (err) {
