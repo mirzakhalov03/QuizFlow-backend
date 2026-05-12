@@ -1,6 +1,6 @@
-import { AppError } from '../helpers/AppError'
+import OpenAI from 'openai'
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+import { AppError } from '../helpers/AppError'
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -21,31 +21,33 @@ export type ChatJsonOptions = {
   temperature?: number
 }
 
-const getApiKey = (override?: string): string => {
-  const key = override ?? process.env.OPENROUTER_API_KEY
+const getClient = (apiKey?: string) => {
+  const key = apiKey ?? process.env.OPENROUTER_API_KEY
 
   if (!key) {
     throw new AppError('OPENROUTER_API_KEY is not configured', 500, 'CONFIG_ERROR')
   }
 
-  return key
-}
-
-export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
-  const apiKey = getApiKey(options.apiKey)
-
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+  return new OpenAI({
+    apiKey: key,
+    baseURL: 'https://openrouter.ai/api/v1',
+    defaultHeaders: {
       'HTTP-Referer': process.env.APP_URL ?? 'http://localhost:3000',
       'X-Title': 'QuizFlow',
     },
-    body: JSON.stringify({
+  })
+}
+
+export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
+  const client = getClient(options.apiKey)
+
+  let completion: OpenAI.Chat.ChatCompletion
+
+  try {
+    completion = await client.chat.completions.create({
       model: options.model,
-      messages: options.messages,
       temperature: options.temperature ?? 0.4,
+      messages: options.messages,
       response_format: {
         type: 'json_schema',
         json_schema: {
@@ -54,36 +56,27 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
           schema: options.schema.schema,
         },
       },
-    }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new AppError(
-      `OpenRouter request failed (${response.status})`,
-      502,
-      'OPENROUTER_ERROR',
-      body,
-    )
-  }
-
-  let payload: { choices?: { message?: { content?: string } }[] }
-  try {
-    payload = (await response.json()) as typeof payload
-  } catch (error) {
-    throw new AppError('OpenRouter returned an invalid JSON response', 502, 'OPENROUTER_ERROR', {
-      error,
     })
+  } catch (err) {
+    if (err instanceof OpenAI.APIError) {
+      throw new AppError(
+        `OpenRouter request failed (${err.status})`,
+        502,
+        'OPENROUTER_ERROR',
+        err.message,
+      )
+    }
+    throw err
   }
 
-  const content = payload.choices?.[0]?.message?.content
+  const content = completion.choices[0]?.message?.content
 
   if (!content) {
     throw new AppError(
       'OpenRouter returned an empty response',
       502,
       'OPENROUTER_EMPTY_RESPONSE',
-      payload,
+      completion,
     )
   }
 

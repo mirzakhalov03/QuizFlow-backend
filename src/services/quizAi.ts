@@ -75,20 +75,40 @@ const buildSchema = (type?: QuestionType) => ({
 const buildSystemPrompt = (type: QuestionType | undefined, count: number) => {
   const typeRule = type
     ? `Every question MUST be of type "${type}".`
-    : `Pick the most appropriate type per question from: ${QUESTION_TYPES.join(', ')}.`
+    : `Pick the most appropriate type per question from: ${QUESTION_TYPES.join(', ')}. Vary the types across the quiz — do not use the same type for every question.`
 
   return [
-    'You are a quiz generator that produces high-quality questions strictly grounded in the source material the user provides.',
-    'Rules:',
+    'You are an expert quiz designer. Your goal is to produce questions that genuinely test whether a student understood the source material — not just whether they memorised isolated facts.',
+    '',
+    '## Output rules',
     `- Generate exactly ${count} questions.`,
     typeRule,
-    '- For "open_ended" questions, return a single option whose text is the model answer, isCorrect=true, with an explanation that summarizes what a correct response should contain.',
-    '- For "true_false" questions, return exactly two options ("True" and "False"), with exactly one marked isCorrect=true.',
-    '- For "multiple_choice", return 4 options with exactly one isCorrect=true.',
-    '- For "multi_select", return 4-5 options with two or more isCorrect=true.',
-    '- Every option MUST include a one-sentence explanation of why it is correct or incorrect, grounded in the source material.',
-    '- Do not invent facts that are not supported by the source material.',
-    '- Return ONLY JSON conforming to the provided schema. No prose, no markdown.',
+    '',
+    '## Question type constraints',
+    '- "multiple_choice": 4 options, exactly one isCorrect=true.',
+    '- "multi_select": 4–5 options, two or more isCorrect=true.',
+    '- "true_false": exactly two options with the text "True" and "False", exactly one isCorrect=true.',
+    '- "open_ended": exactly one option whose text is a concise model answer (2–4 sentences). isCorrect=true. The explanation should describe what key points a complete answer must cover.',
+    '',
+    '## Question quality',
+    `- Distribute questions evenly across the full source material. If the text has ${count} distinct sections or ideas, draw one question from each. Never cluster more than two questions around the same passage.`,
+    '- Vary cognitive depth. At least one question per five must go beyond recall — ask why something happens, what the consequence of a decision is, or how two concepts relate.',
+    '- Write question stems as complete, unambiguous sentences. Avoid double negatives and "which of the following is NOT" phrasing unless the concept genuinely requires it.',
+    '- No two questions may test the same fact or concept, even if worded differently.',
+    '',
+    '## Distractor quality (multiple_choice and multi_select)',
+    '- Wrong options must be plausible to a student who partially understood the material — a common misconception, a related-but-incorrect term, or a value that is close but wrong.',
+    '- Never use "all of the above", "none of the above", or obviously absurd options.',
+    '- Correct and incorrect options should be similar in length and grammatical form.',
+    '',
+    '## Explanations',
+    '- Every option must have an explanation field.',
+    '- For correct options: one sentence explaining why it is right, citing the relevant part of the source.',
+    '- For incorrect options: one sentence explaining the misconception or why it is wrong.',
+    '',
+    '## Grounding',
+    '- Every question and every answer must be directly supported by the source material.',
+    '- Do not introduce facts, definitions, or claims that are not present in the source.',
   ].join('\n')
 }
 
