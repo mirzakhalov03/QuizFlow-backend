@@ -18,8 +18,17 @@ export const generateQuizController = async (req: Request, res: Response, next: 
   try {
     const userId = getAuthUserId(req)
 
-    const { s3Url, bucket, key, title, userInstructions, isTimerEnabled, timerDuration, type } =
-      req.body as GenerateQuizInput
+    const {
+      s3Url,
+      bucket,
+      key,
+      title,
+      userInstructions,
+      isTimerEnabled,
+      timerDuration,
+      type,
+      questionCount,
+    } = req.body as GenerateQuizInput
 
     let resolvedBucket = bucket
     let resolvedKey = key
@@ -47,6 +56,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       isTimerEnabled: Boolean(isTimerEnabled),
       timerDuration,
       type,
+      questionCount,
     })
 
     res.status(202).json(

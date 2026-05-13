@@ -14,6 +14,10 @@ class AuthService {
     const tokens = await this.exchangeGoogleCode(code)
     const profile = await this.fetchGoogleProfile(tokens.access_token)
 
+    if (!profile?.email || !profile?.name) {
+      throw new Error(`Google profile missing required fields: ${JSON.stringify(profile)}`)
+    }
+
     const user = await userService.findOrCreateByGoogle(profile)
 
     await profileService.ensureProfile(user.id, profile)
@@ -70,15 +74,24 @@ class AuthService {
         grant_type: 'authorization_code',
       }),
     })
-    if (!res.ok) throw new Error('Failed to exchange code for token:' + (await res.text()))
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to exchange code for token: ${res.status} ${errorText}`)
+    }
 
     return await res.json()
   }
 
   private async fetchGoogleProfile(accessToken: string) {
-    const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to fetch Google profile: ${res.status} ${errorText}`)
+    }
 
     return await res.json()
   }
