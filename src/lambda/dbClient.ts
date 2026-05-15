@@ -29,7 +29,16 @@ export const getLambdaDb = async (): Promise<DrizzleDb> => {
     throw new Error('DATABASE_URL is not defined')
   }
 
-  _client = new Client({ connectionString })
+  const sslEnabled = (process.env.DATABASE_SSL ?? 'true').toLowerCase() === 'true'
+
+  _client = new Client({
+    connectionString,
+    ssl: sslEnabled
+      ? {
+          rejectUnauthorized: false,
+        }
+      : undefined,
+  })
   await _client.connect()
 
   _db = drizzle(_client, { schema })

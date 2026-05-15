@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 
+import { successResponse } from '../helpers/apiResponse'
 import { buildGoogleAuthUrl } from '../helpers/utils/buildGoogleAuthUrl'
 import { buildNotionAuthUrl } from '../helpers/utils/buildNotionAuthUrl'
 import { AuthRequest } from '../middlewares/authMiddleware'
@@ -33,11 +34,13 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax',
+      maxAge: 60 * 60 * 1000, // 1h — matches JWT expiry
     })
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7d — matches JWT expiry
     })
 
     return res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173/')
@@ -65,7 +68,9 @@ const notionCallback = async (req: AuthRequest, res: Response, next: NextFunctio
 
     await authService.handleNotionOAuth(user.id, code)
 
-    return res.redirect('http://localhost:5173/integrations/success')
+    return res.redirect(
+      `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/integrations/success`,
+    )
   } catch (error) {
     next(error)
   }
@@ -89,7 +94,7 @@ const refreshToken = async (req: Request, res: Response, next: NextFunction) => 
 }
 
 const getMe = async (req: AuthRequest, res: Response) => {
-  return res.json(req.user)
+  return res.json(successResponse('User retrieved', req.user))
 }
 export {
   logoutUser,

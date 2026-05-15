@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node ./src/server.ts\"",
     "build": "tsc",
+    "build:lambda": "node ./scripts/build-lambda.js",
     "start": "node ./dist/src/server.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -38,12 +39,15 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
+    "openai": "^6.37.0",
     "pg": "^8.20.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@aws-sdk/client-ec2": "^3.1045.0",
+    "@aws-sdk/client-rds": "^3.1045.0",
     "@eslint/js": "^9.39.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",

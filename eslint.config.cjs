@@ -10,6 +10,20 @@ module.exports = tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Plain Node.js CJS scripts — allow require(), no TS rules
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-undef': 'off',
+    },
+  },
+  {
     files: ['**/*.ts'],
     languageOptions: {
       globals: {
