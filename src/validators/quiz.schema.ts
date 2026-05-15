@@ -106,3 +106,27 @@ export const GetQuizzesSchema = z.object({
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
+
+export const SubmitQuizSchema = z.object({
+  answers: z
+    .array(
+      z
+        .object({
+          questionId: z.string().uuid(),
+          selectedOptionId: z.string().uuid().optional(),
+          textAnswer: z.string().max(5000).optional(),
+        })
+        .superRefine((data, ctx) => {
+          if (!data.selectedOptionId && !data.textAnswer) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [],
+              message: 'Either selectedOptionId or textAnswer is required',
+            })
+          }
+        }),
+    )
+    .min(1, 'At least one answer is required'),
+})
+
+export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>
