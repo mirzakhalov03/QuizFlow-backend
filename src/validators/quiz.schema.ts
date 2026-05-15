@@ -37,7 +37,6 @@ export const GenerateQuizSchema = z
     /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
 
-    /** Number of questions to generate (1–30). */
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
   })
   .superRefine((data, ctx) => {
@@ -50,7 +49,6 @@ export const GenerateQuizSchema = z
       })
     }
 
-    // Timer enabled → duration must be present
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
