@@ -28,6 +28,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       s3Url,
       bucket,
       key,
+      keys,
       title,
       userInstructions,
       isTimerEnabled,
@@ -39,6 +40,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
 
     let resolvedBucket = bucket
     let resolvedKey = key
+    let resolvedKeys = keys
 
     if (s3Url) {
       const parsed = parseS3Url(s3Url)
@@ -53,9 +55,14 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       }
     }
 
+    // Normalise to keys array: prefer explicit keys, else wrap single key
+    if (!resolvedKeys || resolvedKeys.length === 0) {
+      resolvedKeys = resolvedKey ? [resolvedKey] : []
+    }
+
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
-      key: resolvedKey!,
+      keys: resolvedKeys,
       userId,
       title,
       userInstructions,

@@ -10,7 +10,7 @@ import type { QuestionType } from '../types/questionTypes'
 type QuizGeneratePayload = {
   userId: string
   bucket: string
-  key: string
+  keys: string[]
   title?: string
   userInstructions?: string
   isTimerEnabled?: boolean

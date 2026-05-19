@@ -78,16 +78,43 @@ const extractPdfText = (buffer: Buffer): Promise<string> => {
   })
 }
 
+const extractPptxText = (buffer: Buffer): string => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AdmZip = require('adm-zip') as new (buf: Buffer) => {
+    getEntries(): Array<{ entryName: string; getData(): Buffer }>
+  }
+
+  const zip = new AdmZip(buffer)
+  const slideFiles = zip
+    .getEntries()
+    .filter((e) => /^ppt\/slides\/slide\d+\.xml$/i.test(e.entryName))
+    .sort((a, b) => a.entryName.localeCompare(b.entryName, undefined, { numeric: true }))
+
+  const text = slideFiles
+    .map((entry) => {
+      const xml = entry.getData().toString('utf-8')
+      return (xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) ?? [])
+        .map((m) => m.replace(/<[^>]+>/g, ''))
+        .join(' ')
+    })
+    .join('\n\n')
+    .trim()
+
+  if (!text) throw new Error('PPTX appears to be empty — no text could be extracted')
+  return text
+}
+
 export const extractTextFromBuffer = async (
   buffer: Buffer,
   contentType: string,
   key: string,
 ): Promise<string> => {
-  const isPdf = contentType === 'application/pdf' || key.toLowerCase().endsWith('.pdf')
+  const lowerKey = key.toLowerCase()
+  const isPdf = contentType === 'application/pdf' || lowerKey.endsWith('.pdf')
+  const isPptx = contentType.includes('presentationml') || lowerKey.endsWith('.pptx')
 
-  if (isPdf) {
-    return extractPdfText(buffer)
-  }
+  if (isPdf) return extractPdfText(buffer)
+  if (isPptx) return extractPptxText(buffer)
 
   return buffer.toString('utf-8')
 }

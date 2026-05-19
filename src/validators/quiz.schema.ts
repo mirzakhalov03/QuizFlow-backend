@@ -16,8 +16,11 @@ export const GenerateQuizSchema = z
     /** S3 bucket name. Required when `s3Url` is not provided. */
     bucket: z.string().min(1, 'bucket must not be empty').optional(),
 
-    /** S3 object key. Required when `s3Url` is not provided. */
+    /** S3 object key. Required when `s3Url` and `keys` are not provided. */
     key: z.string().min(1, 'key must not be empty').optional(),
+
+    /** Multiple S3 object keys. Takes precedence over `key` when provided. */
+    keys: z.array(z.string().min(1)).min(1).optional(),
 
     /** Human-readable quiz title (max 200 chars). */
     title: z.string().min(1).max(200).optional(),
@@ -44,12 +47,12 @@ export const GenerateQuizSchema = z
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
   })
   .superRefine((data, ctx) => {
-    // Must have either s3Url or key
-    if (!data.s3Url && !data.key) {
+    // Must have either s3Url, key, or keys
+    if (!data.s3Url && !data.key && (!data.keys || data.keys.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['key'],
-        message: 'Either s3Url or key is required',
+        message: 'Either s3Url, key, or keys is required',
       })
     }
 
