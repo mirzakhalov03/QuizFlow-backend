@@ -8,6 +8,7 @@ export default class userProfile {
   userId: string
   bio: string | null
   profilePicture: string | null
+  isOnboarded: boolean
   createdAt: Date
   updatedAt: Date
 
@@ -16,6 +17,7 @@ export default class userProfile {
     userId: string,
     bio: string | null,
     profilePicture: string | null,
+    isOnboarded: boolean,
     createdAt: Date,
     updatedAt: Date,
   ) {
@@ -23,13 +25,16 @@ export default class userProfile {
     this.userId = userId
     this.bio = bio
     this.profilePicture = profilePicture
+    this.isOnboarded = isOnboarded
     this.createdAt = createdAt
     this.updatedAt = updatedAt
   }
+
   static async createUserProfile(userProfileData: {
     userId: string
     bio: string | null
     profilePicture: string | null
+    isOnboarded?: boolean
     createdAt?: Date
     updatedAt?: Date
   }): Promise<userProfile> {
@@ -40,25 +45,21 @@ export default class userProfile {
       newUserProfile.userId,
       newUserProfile.bio,
       newUserProfile.profilePicture,
+      newUserProfile.isOnboarded,
       newUserProfile.createdAt,
       newUserProfile.updatedAt,
     )
   }
+
   static async create(userId: string, bio: string | null, profilePicture: string | null) {
-    const [row] = await db
-      .insert(userProfiles)
-      .values({
-        userId,
-        bio,
-        profilePicture,
-      })
-      .returning()
+    const [row] = await db.insert(userProfiles).values({ userId, bio, profilePicture }).returning()
 
     return new userProfile(
       row.id,
       row.userId,
       row.bio,
       row.profilePicture,
+      row.isOnboarded,
       row.createdAt,
       row.updatedAt,
     )
@@ -78,12 +79,18 @@ export default class userProfile {
       row.userId,
       row.bio,
       row.profilePicture,
+      row.isOnboarded,
       row.createdAt,
       row.updatedAt,
     )
   }
 
-  static async upsert(userId: string, bio?: string | null, profilePicture?: string | null) {
+  static async upsert(
+    userId: string,
+    bio?: string | null,
+    profilePicture?: string | null,
+    isOnboarded?: boolean,
+  ) {
     const existing = await this.findByUserId(userId)
 
     if (!existing) {
@@ -95,6 +102,7 @@ export default class userProfile {
       .set({
         bio: bio ?? existing.bio,
         profilePicture: profilePicture ?? existing.profilePicture,
+        isOnboarded: isOnboarded ?? existing.isOnboarded,
         updatedAt: new Date(),
       })
       .where(eq(userProfiles.userId, userId))
@@ -105,10 +113,12 @@ export default class userProfile {
       updated.userId,
       updated.bio,
       updated.profilePicture,
+      updated.isOnboarded,
       updated.createdAt,
       updated.updatedAt,
     )
   }
+
   static async deleteByUserId(userId: string) {
     await db.delete(userProfiles).where(eq(userProfiles.userId, userId))
   }
