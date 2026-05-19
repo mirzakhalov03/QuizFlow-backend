@@ -59,9 +59,10 @@ const extractPdfText = (buffer: Buffer): Promise<string> => {
           return s
         }
       }
-      const text = data.Pages.flatMap((page) =>
-        page.Texts.flatMap((t) => t.R.map((r) => safeDecode(r.T))),
-      ).join(' ')
+      const text = data.Pages.map((page) => {
+        const blocks = page.Texts.map((t) => t.R.map((r) => safeDecode(r.T)).join(''))
+        return blocks.join('\n')
+      }).join('\n\n')
 
       const trimmed = text.trim()
       if (!trimmed) {
