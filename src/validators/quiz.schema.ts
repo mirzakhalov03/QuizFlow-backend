@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { SUPPORTED_MODELS } from '../constants/models'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
@@ -38,6 +39,9 @@ export const GenerateQuizSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+
+    /** AI model to use for quiz generation. */
+    model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
   })
   .superRefine((data, ctx) => {
     // Must have either s3Url or key

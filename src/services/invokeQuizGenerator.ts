@@ -17,6 +17,7 @@ type QuizGeneratePayload = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  model?: string
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env

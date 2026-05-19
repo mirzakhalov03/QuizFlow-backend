@@ -7,9 +7,10 @@ import { getLambdaDb } from './dbClient'
 import { s3Client } from './s3Client'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
+  extractTextFromBuffer,
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
-  streamToString,
+  streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
 import { generateQuizFromText } from '../services/quizAi'
 import type { AiQuiz } from '../services/quizAi'
@@ -28,6 +29,7 @@ type LambdaEvent = {
   timerDuration?: number
   type?: string
   questionCount?: number
+  model?: string
   quiz?: AiQuiz
 }
 
@@ -104,7 +106,8 @@ const fetchSourceText = async (bucket: string, key: string): Promise<string> => 
     throw new Error('S3 object has no body')
   }
 
-  return streamToString(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
+  const buffer = await streamToBuffer(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
+  return extractTextFromBuffer(buffer, s3Response.ContentType ?? '', key)
 }
 
 export const handler = async (event: LambdaEvent) => {
@@ -123,6 +126,7 @@ export const handler = async (event: LambdaEvent) => {
         type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
         userInstructions: event.userInstructions,
         defaultTitle: event.title,
+        model: event.model,
       }))
 
     const quizRow = await persistQuiz(quiz, event, {

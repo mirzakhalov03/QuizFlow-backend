@@ -34,6 +34,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       timerDuration,
       type,
       questionCount,
+      model,
     } = req.body as GenerateQuizInput
 
     let resolvedBucket = bucket
@@ -62,6 +63,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       timerDuration,
       type,
       questionCount,
+      model,
     })
 
     res.status(202).json(

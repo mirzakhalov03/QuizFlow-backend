@@ -1,8 +1,7 @@
 import { chatJSON } from './openRouter'
+import { DEFAULT_MODEL } from '../constants/models'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
-
-const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.0-flash-001'
 const SOURCE_TEXT_LIMIT = 50_000
 const DEFAULT_QUESTION_COUNT = 5
 
@@ -29,6 +28,7 @@ type GenerateOptions = {
   type?: QuestionType
   userInstructions?: string
   defaultTitle?: string
+  model?: string
 }
 
 const buildSchema = (type?: QuestionType) => ({
@@ -118,6 +118,7 @@ export const generateQuizFromText = async ({
   type,
   userInstructions,
   defaultTitle,
+  model,
 }: GenerateOptions): Promise<AiQuiz> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -138,7 +139,7 @@ export const generateQuizFromText = async ({
   }
 
   return chatJSON<AiQuiz>({
-    model: DEFAULT_MODEL,
+    model: model ?? DEFAULT_MODEL,
     schema: buildSchema(type),
     temperature: 0.3,
     messages: [
