@@ -124,7 +124,22 @@ export const SubmitQuizSchema = z.object({
           }
         }),
     )
-    .min(1, 'At least one answer is required'),
+    .min(1, 'At least one answer is required')
+    .max(100, 'Too many answers submitted')
+    .superRefine((answers, ctx) => {
+      const seen = new Set<string>()
+
+      answers.forEach((answer, index) => {
+        if (seen.has(answer.questionId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate questionId: ${answer.questionId}`,
+            path: [index, 'questionId'],
+          })
+        }
+        seen.add(answer.questionId)
+      })
+    }),
 })
 
 export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>

@@ -157,6 +157,9 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
 
   const questionsById = new Map(quizQuestions.map((q) => [q.id, q]))
 
+  const selectedOptionIds: string[] = []
+  const processedQuestionIds = new Set<string>()
+
   for (const answer of answers) {
     if (!questionsById.has(answer.questionId)) {
       throw new AppError(
@@ -165,11 +168,14 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
         'VALIDATION_ERROR',
       )
     }
-  }
 
-  const selectedOptionIds = answers
-    .map((a) => a.selectedOptionId)
-    .filter((id): id is string => Boolean(id))
+    if (processedQuestionIds.has(answer.questionId)) continue
+    processedQuestionIds.add(answer.questionId)
+
+    if (answer.selectedOptionId) {
+      selectedOptionIds.push(answer.selectedOptionId)
+    }
+  }
 
   const optionRows =
     selectedOptionIds.length > 0
@@ -185,8 +191,20 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
 
   const optionsById = new Map(optionRows.map((o) => [o.id, o]))
 
+  let correctAnswers = 0
+  const gradableQuestionIds = new Set(
+    quizQuestions.filter((q) => q.type !== 'open_ended').map((q) => q.id),
+  )
+  const scoredQuestions = new Set<string>()
+
   for (const answer of answers) {
-    if (!answer.selectedOptionId) continue
+    if (scoredQuestions.has(answer.questionId)) continue
+
+    if (!answer.selectedOptionId) {
+      scoredQuestions.add(answer.questionId)
+      continue
+    }
+
     const option = optionsById.get(answer.selectedOptionId)
     if (!option || option.questionId !== answer.questionId) {
       throw new AppError(
@@ -195,40 +213,36 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
         'VALIDATION_ERROR',
       )
     }
-  }
 
-  const gradableQuestionIds = new Set(
-    quizQuestions.filter((q) => q.type !== 'open_ended').map((q) => q.id),
-  )
+    if (gradableQuestionIds.has(answer.questionId) && option.isCorrect) {
+      correctAnswers += 1
+    }
 
-  let correctAnswers = 0
-  for (const answer of answers) {
-    if (!gradableQuestionIds.has(answer.questionId)) continue
-    const option = answer.selectedOptionId ? optionsById.get(answer.selectedOptionId) : undefined
-    if (option?.isCorrect) correctAnswers += 1
+    scoredQuestions.add(answer.questionId)
   }
 
   const totalQuestions = gradableQuestionIds.size
   const wrongAnswers = totalQuestions - correctAnswers
 
   const result = await db.transaction(async (tx) => {
-    for (const answer of answers) {
-      await tx
-        .insert(userAnswers)
-        .values({
-          userId,
-          questionId: answer.questionId,
-          selectedOptionId: answer.selectedOptionId ?? null,
-          textAnswer: answer.textAnswer ?? null,
-        })
-        .onConflictDoUpdate({
-          target: [userAnswers.userId, userAnswers.questionId],
-          set: {
-            selectedOptionId: answer.selectedOptionId ?? null,
-            textAnswer: answer.textAnswer ?? null,
-          },
-        })
-    }
+    const answerValues = answers.map((answer) => ({
+      userId,
+      questionId: answer.questionId,
+      selectedOptionId: answer.selectedOptionId ?? null,
+      textAnswer: answer.textAnswer ?? null,
+      updatedAt: new Date(),
+    }))
+    await tx
+      .insert(userAnswers)
+      .values(answerValues)
+      .onConflictDoUpdate({
+        target: [userAnswers.userId, userAnswers.questionId],
+        set: {
+          selectedOptionId: sql`excluded.selected_option_id`,
+          textAnswer: sql`excluded.text_answer`,
+          updatedAt: new Date(),
+        },
+      })
 
     const [resultRow] = await tx
       .insert(quizResults)

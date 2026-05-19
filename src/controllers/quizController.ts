@@ -176,14 +176,14 @@ export const submitQuizController = async (req: Request, res: Response, next: Ne
     const userId = getAuthUserId(req)
 
     const rawId = req.params.id
-    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
-    if (!id) {
+    const quizId = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!quizId) {
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
 
     const { answers } = req.body as SubmitQuizInput
 
-    const result = await submitQuiz(id, userId, answers)
+    const result = await submitQuiz(quizId, userId, answers)
     if (!result) {
       throw new AppError('Quiz not found', 404, 'NOT_FOUND')
     }
