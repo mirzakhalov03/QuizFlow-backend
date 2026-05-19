@@ -37,7 +37,6 @@ export const GenerateQuizSchema = z
     /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
 
-    /** Number of questions to generate (1–30). */
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
   })
   .superRefine((data, ctx) => {
@@ -50,7 +49,6 @@ export const GenerateQuizSchema = z
       })
     }
 
-    // Timer enabled → duration must be present
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -106,3 +104,42 @@ export const GetQuizzesSchema = z.object({
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
+
+export const SubmitQuizSchema = z.object({
+  answers: z
+    .array(
+      z
+        .object({
+          questionId: z.string().uuid(),
+          selectedOptionId: z.string().uuid().optional(),
+          textAnswer: z.string().max(5000).optional(),
+        })
+        .superRefine((data, ctx) => {
+          if (!data.selectedOptionId && !data.textAnswer) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [],
+              message: 'Either selectedOptionId or textAnswer is required',
+            })
+          }
+        }),
+    )
+    .min(1, 'At least one answer is required')
+    .max(100, 'Too many answers submitted')
+    .superRefine((answers, ctx) => {
+      const seen = new Set<string>()
+
+      answers.forEach((answer, index) => {
+        if (seen.has(answer.questionId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate questionId: ${answer.questionId}`,
+            path: [index, 'questionId'],
+          })
+        }
+        seen.add(answer.questionId)
+      })
+    }),
+})
+
+export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>

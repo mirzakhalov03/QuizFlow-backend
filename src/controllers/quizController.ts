@@ -10,9 +10,15 @@ import {
   getJobById,
   getQuizById,
   getQuizzes,
+  submitQuiz,
   updateQuizById,
 } from '../services/quiz.service'
-import type { GenerateQuizInput, GetQuizzesQuery, PatchQuizInput } from '../validators/quiz.schema'
+import type {
+  GenerateQuizInput,
+  GetQuizzesQuery,
+  PatchQuizInput,
+  SubmitQuizInput,
+} from '../validators/quiz.schema'
 
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -46,7 +52,6 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       }
     }
 
-    // Returns the jobId (UUID) — client polls GET /quizzes/jobs/:jobId
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       key: resolvedKey!,
@@ -161,6 +166,29 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
     }
 
     res.status(200).json(successResponse('Quiz updated successfully', updatedQuiz))
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const submitQuizController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+
+    const rawId = req.params.id
+    const quizId = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!quizId) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const { answers } = req.body as SubmitQuizInput
+
+    const result = await submitQuiz(quizId, userId, answers)
+    if (!result) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Quiz submitted successfully', result))
   } catch (error) {
     next(error)
   }

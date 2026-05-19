@@ -9,6 +9,7 @@ import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
 import authRoutes from './routes/auth.routes'
+import byokRoutes from './routes/byok.routes'
 import healthRoutes from './routes/health.routes'
 import quizRoutes from './routes/quiz.routes'
 import uploadRoutes from './routes/upload.routes'
@@ -34,6 +35,7 @@ app.use(userProfileRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
+app.use(byokRoutes)
 
 app.use(handleMulterError)
 app.use(notFoundHandler)

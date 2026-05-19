@@ -1,7 +1,15 @@
 import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
+import {
+  questionOptions,
+  questions,
+  quizJobs,
+  quizResults,
+  quizzes,
+  userAnswers,
+} from '../database/schema'
+import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
 
 type GetQuizzesParams = {
@@ -57,10 +65,6 @@ export const getQuizzes = async ({ userId, limit = 20, offset = 0, search }: Get
   return { items, total }
 }
 
-/**
- * Fetch a single quiz with its full nested questions and options.
- * userId is required — users can only access their own quizzes.
- */
 export const getQuizById = async (id: string, userId: string) => {
   const [quiz] = await db
     .select()
@@ -127,10 +131,142 @@ export const deleteQuizById = async (id: string, userId: string) => {
   return deletedRows.length > 0
 }
 
-/**
- * Get the status of an async quiz generation job.
- * Returns the job row so the client can poll until status is 'done' or 'failed'.
- */
+type SubmitAnswerInput = {
+  questionId: string
+  selectedOptionId?: string
+  textAnswer?: string
+}
+
+export const submitQuiz = async (quizId: string, userId: string, answers: SubmitAnswerInput[]) => {
+  const [quiz] = await db
+    .select({ id: quizzes.id })
+    .from(quizzes)
+    .where(and(eq(quizzes.id, quizId), eq(quizzes.userId, userId)))
+    .limit(1)
+
+  if (!quiz) return null
+
+  const quizQuestions = await db
+    .select({ id: questions.id, type: questions.type })
+    .from(questions)
+    .where(eq(questions.quizId, quizId))
+
+  if (quizQuestions.length === 0) {
+    throw new AppError('Quiz has no questions to submit', 400, 'VALIDATION_ERROR')
+  }
+
+  const questionsById = new Map(quizQuestions.map((q) => [q.id, q]))
+
+  const selectedOptionIds: string[] = []
+  const processedQuestionIds = new Set<string>()
+
+  for (const answer of answers) {
+    if (!questionsById.has(answer.questionId)) {
+      throw new AppError(
+        `Question ${answer.questionId} does not belong to this quiz`,
+        400,
+        'VALIDATION_ERROR',
+      )
+    }
+
+    if (processedQuestionIds.has(answer.questionId)) continue
+    processedQuestionIds.add(answer.questionId)
+
+    if (answer.selectedOptionId) {
+      selectedOptionIds.push(answer.selectedOptionId)
+    }
+  }
+
+  const optionRows =
+    selectedOptionIds.length > 0
+      ? await db
+          .select({
+            id: questionOptions.id,
+            questionId: questionOptions.questionId,
+            isCorrect: questionOptions.isCorrect,
+          })
+          .from(questionOptions)
+          .where(inArray(questionOptions.id, selectedOptionIds))
+      : []
+
+  const optionsById = new Map(optionRows.map((o) => [o.id, o]))
+
+  let correctAnswers = 0
+  const gradableQuestionIds = new Set(
+    quizQuestions.filter((q) => q.type !== 'open_ended').map((q) => q.id),
+  )
+  const scoredQuestions = new Set<string>()
+
+  for (const answer of answers) {
+    if (scoredQuestions.has(answer.questionId)) continue
+
+    if (!answer.selectedOptionId) {
+      scoredQuestions.add(answer.questionId)
+      continue
+    }
+
+    const option = optionsById.get(answer.selectedOptionId)
+    if (!option || option.questionId !== answer.questionId) {
+      throw new AppError(
+        `Option ${answer.selectedOptionId} does not belong to question ${answer.questionId}`,
+        400,
+        'VALIDATION_ERROR',
+      )
+    }
+
+    if (gradableQuestionIds.has(answer.questionId) && option.isCorrect) {
+      correctAnswers += 1
+    }
+
+    scoredQuestions.add(answer.questionId)
+  }
+
+  const totalQuestions = gradableQuestionIds.size
+  const wrongAnswers = totalQuestions - correctAnswers
+
+  const result = await db.transaction(async (tx) => {
+    const answerValues = answers.map((answer) => ({
+      userId,
+      questionId: answer.questionId,
+      selectedOptionId: answer.selectedOptionId ?? null,
+      textAnswer: answer.textAnswer ?? null,
+      updatedAt: new Date(),
+    }))
+    await tx
+      .insert(userAnswers)
+      .values(answerValues)
+      .onConflictDoUpdate({
+        target: [userAnswers.userId, userAnswers.questionId],
+        set: {
+          selectedOptionId: sql`excluded.selected_option_id`,
+          textAnswer: sql`excluded.text_answer`,
+          updatedAt: new Date(),
+        },
+      })
+
+    const [resultRow] = await tx
+      .insert(quizResults)
+      .values({
+        userId,
+        quizId,
+        totalQuestions,
+        correctAnswers,
+        wrongAnswers,
+      })
+      .onConflictDoUpdate({
+        target: [quizResults.userId, quizResults.quizId],
+        set: { totalQuestions, correctAnswers, wrongAnswers },
+      })
+      .returning()
+
+    await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
+
+    return resultRow
+  })
+
+  return result
+}
+
 export const getJobById = async (jobId: string, userId: string) => {
   const [job] = await db
     .select()

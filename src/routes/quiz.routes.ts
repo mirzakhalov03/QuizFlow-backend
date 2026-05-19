@@ -7,10 +7,16 @@ import {
   getQuizByIdController,
   getQuizzesController,
   patchQuizByIdController,
+  submitQuizController,
 } from '../controllers/quizController'
 import { authMiddleware } from '../middlewares/authMiddleware'
 import { validate, validateQuery } from '../middlewares/validate'
-import { GenerateQuizSchema, GetQuizzesSchema, PatchQuizSchema } from '../validators/quiz.schema'
+import {
+  GenerateQuizSchema,
+  GetQuizzesSchema,
+  PatchQuizSchema,
+  SubmitQuizSchema,
+} from '../validators/quiz.schema'
 
 const router = Router()
 
@@ -167,6 +173,58 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
  *         description: Quiz not found
  */
 router.patch('/quizzes/:id', authMiddleware, validate(PatchQuizSchema), patchQuizByIdController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/submit:
+ *   post:
+ *     tags:
+ *       - Quiz
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Submit answers for a quiz and receive the calculated result
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - answers
+ *             properties:
+ *               answers:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - questionId
+ *                   properties:
+ *                     questionId:
+ *                       type: string
+ *                       format: uuid
+ *                     selectedOptionId:
+ *                       type: string
+ *                       format: uuid
+ *                     textAnswer:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Quiz submitted, result returned
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Quiz not found
+ */
+router.post('/quizzes/:id/submit', authMiddleware, validate(SubmitQuizSchema), submitQuizController)
 
 /**
  * @openapi
