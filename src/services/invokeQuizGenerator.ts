@@ -10,13 +10,14 @@ import type { QuestionType } from '../types/questionTypes'
 type QuizGeneratePayload = {
   userId: string
   bucket: string
-  key: string
+  keys: string[]
   title?: string
   userInstructions?: string
   isTimerEnabled?: boolean
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  model?: string
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env

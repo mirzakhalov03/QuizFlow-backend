@@ -22,9 +22,14 @@ export const getUserProfile = async (req: AuthRequest, res: Response, next: Next
 
 export const updateUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { bio, profilePicture } = req.body
+    const { bio, profilePicture, isOnboarded } = req.body
 
-    const updated = await userProfile.upsert(req.user!.id, bio ?? null, profilePicture ?? null)
+    const updated = await userProfile.upsert(
+      req.user!.id,
+      bio ?? null,
+      profilePicture ?? null,
+      isOnboarded,
+    )
 
     return res.json(updated)
   } catch (error) {
