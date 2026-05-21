@@ -2,10 +2,12 @@ import { eq } from 'drizzle-orm'
 import jwt from 'jsonwebtoken'
 
 import integrationService from './integrationService'
+import notionService from './notionService'
 import profileService from './profileService'
 import userService from './userService'
 import { db } from '../database/database'
 import { users } from '../database/schema'
+import { AppError } from '../helpers/AppError'
 import { generateAccessToken, generateRefreshToken } from '../helpers/utils/jwt'
 import User from '../models/user.model'
 
@@ -13,6 +15,10 @@ class AuthService {
   async handleGoogleOAuth(code: string) {
     const tokens = await this.exchangeGoogleCode(code)
     const profile = await this.fetchGoogleProfile(tokens.access_token)
+
+    if (!profile?.email || !profile?.name) {
+      throw new Error(`Google profile missing required fields: ${JSON.stringify(profile)}`)
+    }
 
     const user = await userService.findOrCreateByGoogle(profile)
 
@@ -28,15 +34,7 @@ class AuthService {
   }
 
   async handleNotionOAuth(userId: string, code: string) {
-    const token = await this.exchangeNotionCode(code)
-
-    if (!token?.access_token) {
-      throw new Error('Failed to get Notion token')
-    }
-
-    await integrationService.upsertNotion(userId, token.access_token)
-
-    return true
+    return notionService.connect(userId, code)
   }
 
   async refreshAccessToken(refreshToken: string) {
@@ -49,7 +47,7 @@ class AuthService {
     const user = await User.findById(decoded.id)
 
     if (!user || user.refreshToken !== refreshToken) {
-      throw new Error('Invalid refresh token')
+      throw new AppError('No refresh token', 401)
     }
 
     return generateAccessToken({ id: user.id })
@@ -70,36 +68,24 @@ class AuthService {
         grant_type: 'authorization_code',
       }),
     })
-    if (!res.ok) throw new Error('Failed to exchange code for token:' + (await res.text()))
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to exchange code for token: ${res.status} ${errorText}`)
+    }
 
     return await res.json()
   }
 
   private async fetchGoogleProfile(accessToken: string) {
-    const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
 
-    return await res.json()
-  }
-
-  private async exchangeNotionCode(code: string) {
-    const res = await fetch('https://api.notion.com/v1/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization:
-          'Basic ' +
-          Buffer.from(
-            `${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`,
-          ).toString('base64'),
-      },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: process.env.NOTION_REDIRECT_URI,
-      }),
-    })
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Failed to fetch Google profile: ${res.status} ${errorText}`)
+    }
 
     return await res.json()
   }

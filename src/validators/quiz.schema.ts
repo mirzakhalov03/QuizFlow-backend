@@ -36,6 +36,9 @@ export const GenerateQuizSchema = z
 
     /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
+
+    /** Number of questions to generate (1–30). */
+    questionCount: z.coerce.number().int().min(1).max(30).optional(),
   })
   .superRefine((data, ctx) => {
     // Must have either s3Url or key
@@ -103,3 +106,43 @@ export const GetQuizzesSchema = z.object({
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
+
+export const GenerateQuizFromNotionSchema = z
+  .object({
+    /** Notion page ID to fetch content from. */
+    pageId: z.string().min(1, 'pageId is required'),
+
+    /** Human-readable quiz title (max 200 chars). */
+    title: z.string().min(1).max(200).optional(),
+
+    /** Additional generation instructions for the AI. */
+    userInstructions: z.string().max(1000).optional(),
+
+    /** Whether a per-question countdown timer should be enabled. */
+    isTimerEnabled: z.boolean().optional(),
+
+    /** Duration in seconds per question. Must be a positive integer when supplied. */
+    timerDuration: z.coerce
+      .number()
+      .int()
+      .positive('timerDuration must be a positive integer')
+      .optional(),
+
+    /** Question format for the generated quiz. */
+    type: QuestionTypeEnum.optional(),
+
+    /** Number of questions to generate (1–30). */
+    questionCount: z.coerce.number().int().min(1).max(30).optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Timer enabled → duration must be present
+    if (data.isTimerEnabled && !data.timerDuration) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['timerDuration'],
+        message: 'timerDuration is required when isTimerEnabled is true',
+      })
+    }
+  })
+
+export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
