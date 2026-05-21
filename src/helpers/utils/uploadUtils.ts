@@ -13,6 +13,7 @@ export const ALLOWED_MIME_TYPES = [
   'text/markdown',
   'application/msword', // .doc
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
 ]
 
 export type MulterRequest = Request & { file?: Express.Multer.File; files?: Express.Multer.File[] }

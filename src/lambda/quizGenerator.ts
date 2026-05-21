@@ -7,9 +7,10 @@ import { getLambdaDb } from './dbClient'
 import { s3Client } from './s3Client'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
+  extractTextFromBuffer,
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
-  streamToString,
+  streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
 import { generateQuizFromText } from '../services/quizAi'
 import type { AiQuiz } from '../services/quizAi'
@@ -20,7 +21,8 @@ import type { QuestionType } from '../types/questionTypes'
 type LambdaEvent = {
   jobId: string
   bucket: string
-  key: string
+  key?: string
+  keys?: string[]
   userId: string
   title?: string
   userInstructions?: string
@@ -28,6 +30,7 @@ type LambdaEvent = {
   timerDuration?: number
   type?: string
   questionCount?: number
+  model?: string
   quiz?: AiQuiz
 }
 
@@ -104,30 +107,36 @@ const fetchSourceText = async (bucket: string, key: string): Promise<string> => 
     throw new Error('S3 object has no body')
   }
 
-  return streamToString(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
+  const buffer = await streamToBuffer(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
+  return extractTextFromBuffer(buffer, s3Response.ContentType ?? '', key)
 }
 
 export const handler = async (event: LambdaEvent) => {
-  if (!event?.bucket || !event?.key || !event?.userId || !event?.jobId) {
-    throw new Error('bucket, key, userId, and jobId are required')
+  const allKeys = event.keys?.length ? event.keys : event.key ? [event.key] : []
+  if (!event?.bucket || allKeys.length === 0 || !event?.userId || !event?.jobId) {
+    throw new Error('bucket, key/keys, userId, and jobId are required')
   }
 
   const db = await getLambdaDb()
 
   try {
+    const sourceTexts = await Promise.all(allKeys.map((k) => fetchSourceText(event.bucket, k)))
+    const sourceText = sourceTexts.join('\n\n---\n\n')
+
     const quiz =
       event.quiz ??
       (await generateQuizFromText({
-        sourceText: await fetchSourceText(event.bucket, event.key),
+        sourceText,
         questionCount: event.questionCount,
         type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
         userInstructions: event.userInstructions,
         defaultTitle: event.title,
+        model: event.model,
       }))
 
     const quizRow = await persistQuiz(quiz, event, {
       bucket: event.bucket,
-      key: event.key,
+      key: allKeys[0],
     })
 
     // Update job → done

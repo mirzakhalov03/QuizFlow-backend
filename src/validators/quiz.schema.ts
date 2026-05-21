@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { SUPPORTED_MODELS } from '../constants/models'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
@@ -15,8 +16,11 @@ export const GenerateQuizSchema = z
     /** S3 bucket name. Required when `s3Url` is not provided. */
     bucket: z.string().min(1, 'bucket must not be empty').optional(),
 
-    /** S3 object key. Required when `s3Url` is not provided. */
+    /** S3 object key. Required when `s3Url` and `keys` are not provided. */
     key: z.string().min(1, 'key must not be empty').optional(),
+
+    /** Multiple S3 object keys. Takes precedence over `key` when provided. */
+    keys: z.array(z.string().min(1)).min(1).optional(),
 
     /** Human-readable quiz title (max 200 chars). */
     title: z.string().min(1).max(200).optional(),
@@ -37,20 +41,21 @@ export const GenerateQuizSchema = z
     /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
 
-    /** Number of questions to generate (1–30). */
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+
+    /** AI model to use for quiz generation. */
+    model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
   })
   .superRefine((data, ctx) => {
-    // Must have either s3Url or key
-    if (!data.s3Url && !data.key) {
+    // Must have either s3Url, key, or keys
+    if (!data.s3Url && !data.key && (!data.keys || data.keys.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['key'],
-        message: 'Either s3Url or key is required',
+        message: 'Either s3Url, key, or keys is required',
       })
     }
 
-    // Timer enabled → duration must be present
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -109,33 +114,25 @@ export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
 
 export const GenerateQuizFromNotionSchema = z
   .object({
-    /** Notion page ID to fetch content from. */
     pageId: z.string().min(1, 'pageId is required'),
 
-    /** Human-readable quiz title (max 200 chars). */
     title: z.string().min(1).max(200).optional(),
 
-    /** Additional generation instructions for the AI. */
     userInstructions: z.string().max(1000).optional(),
 
-    /** Whether a per-question countdown timer should be enabled. */
     isTimerEnabled: z.boolean().optional(),
 
-    /** Duration in seconds per question. Must be a positive integer when supplied. */
     timerDuration: z.coerce
       .number()
       .int()
       .positive('timerDuration must be a positive integer')
       .optional(),
 
-    /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
 
-    /** Number of questions to generate (1–30). */
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
   })
   .superRefine((data, ctx) => {
-    // Timer enabled → duration must be present
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -146,3 +143,41 @@ export const GenerateQuizFromNotionSchema = z
   })
 
 export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
+export const SubmitQuizSchema = z.object({
+  answers: z
+    .array(
+      z
+        .object({
+          questionId: z.string().uuid(),
+          selectedOptionId: z.string().uuid().optional(),
+          textAnswer: z.string().max(5000).optional(),
+        })
+        .superRefine((data, ctx) => {
+          if (!data.selectedOptionId && !data.textAnswer) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [],
+              message: 'Either selectedOptionId or textAnswer is required',
+            })
+          }
+        }),
+    )
+    .min(1, 'At least one answer is required')
+    .max(100, 'Too many answers submitted')
+    .superRefine((answers, ctx) => {
+      const seen = new Set<string>()
+
+      answers.forEach((answer, index) => {
+        if (seen.has(answer.questionId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate questionId: ${answer.questionId}`,
+            path: [index, 'questionId'],
+          })
+        }
+        seen.add(answer.questionId)
+      })
+    }),
+})
+
+export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>
