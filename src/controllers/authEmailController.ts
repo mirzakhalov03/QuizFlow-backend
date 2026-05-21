@@ -19,20 +19,12 @@ const COOKIE_REFRESH_TOKEN_OPTIONS = {
 const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, fullName, password } = req.body
-    const { user, accessToken, refreshToken } = await authEmailService.register(
-      email,
-      fullName,
-      password,
-    )
+    const { accessToken, refreshToken } = await authEmailService.register(email, fullName, password)
 
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)
 
-    return res.json(
-      successResponse('User registered', {
-        user: { id: user.id, email: user.email, fullName: user.fullName },
-      }),
-    )
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/dashboard`)
   } catch (error) {
     next(error)
   }

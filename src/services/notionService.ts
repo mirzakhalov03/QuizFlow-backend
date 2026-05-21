@@ -156,8 +156,8 @@ class NotionService {
             const rowText = this.formatPageBlock(row)
             if (rowText) this.push(content, state, rowText)
           }
-        } catch (err) {
-          console.warn(`Failed to query database ${block.id}:`, err)
+        } catch {
+          // silently skip unreadable databases
         }
       } else if (block.type === 'table') {
         const tableRows = await notion.blocks.children.list({ block_id: block.id, page_size: 100 })
