@@ -2,10 +2,12 @@ import { eq } from 'drizzle-orm'
 import jwt from 'jsonwebtoken'
 
 import integrationService from './integrationService'
+import notionService from './notionService'
 import profileService from './profileService'
 import userService from './userService'
 import { db } from '../database/database'
 import { users } from '../database/schema'
+import { AppError } from '../helpers/AppError'
 import { generateAccessToken, generateRefreshToken } from '../helpers/utils/jwt'
 import User from '../models/user.model'
 
@@ -32,15 +34,7 @@ class AuthService {
   }
 
   async handleNotionOAuth(userId: string, code: string) {
-    const token = await this.exchangeNotionCode(code)
-
-    if (!token?.access_token) {
-      throw new Error('Failed to get Notion token')
-    }
-
-    await integrationService.upsertNotion(userId, token.access_token)
-
-    return true
+    return notionService.connect(userId, code)
   }
 
   async refreshAccessToken(refreshToken: string) {
@@ -53,7 +47,7 @@ class AuthService {
     const user = await User.findById(decoded.id)
 
     if (!user || user.refreshToken !== refreshToken) {
-      throw new Error('Invalid refresh token')
+      throw new AppError('No refresh token', 401)
     }
 
     return generateAccessToken({ id: user.id })
@@ -92,27 +86,6 @@ class AuthService {
       const errorText = await res.text()
       throw new Error(`Failed to fetch Google profile: ${res.status} ${errorText}`)
     }
-
-    return await res.json()
-  }
-
-  private async exchangeNotionCode(code: string) {
-    const res = await fetch('https://api.notion.com/v1/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization:
-          'Basic ' +
-          Buffer.from(
-            `${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`,
-          ).toString('base64'),
-      },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: process.env.NOTION_REDIRECT_URI,
-      }),
-    })
 
     return await res.json()
   }

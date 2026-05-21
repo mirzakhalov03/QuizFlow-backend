@@ -11,7 +11,7 @@ const logoutUser = (req: Request, res: Response, next: NextFunction) => {
     res.clearCookie('accessToken')
     res.clearCookie('refreshToken')
 
-    return res.status(200).json({ message: 'Logged out successfully' })
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}`)
   } catch (error) {
     next(error)
   }
@@ -43,7 +43,9 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7d — matches JWT expiry
     })
 
-    return res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173/')
+    return res.redirect(
+      process.env.FRONTEND_URL + '/app/dashboard' || 'http://localhost:5173/app/dashboard',
+    )
   } catch (error) {
     next(error)
   }

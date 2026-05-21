@@ -11,6 +11,7 @@ type AuthUser = {
   id: string
   email: string
   fullName: string
+  hasPassword: boolean
 }
 
 export type AuthRequest = Request & {
@@ -37,6 +38,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      hasPassword: user.password !== null,
     }
 
     next()

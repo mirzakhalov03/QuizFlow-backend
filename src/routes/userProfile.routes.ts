@@ -13,7 +13,7 @@ import { authMiddleware } from '../middlewares/authMiddleware'
 const router = express.Router()
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB
 })
 
 router.get('/userProfile/me', authMiddleware, getUserProfile)

@@ -26,8 +26,9 @@ function validateImageFile(file: Express.Multer.File) {
 }
 
 class UserProfileImageService {
-  static buildS3Key(userId: string) {
-    return `users/${userId}/avatar`
+  static buildS3Key(userId: string, file: Express.Multer.File) {
+    const extension = file.mimetype.split('/')[1]
+    return `users/${userId}/avatar.${extension}`
   }
 
   static buildFileUrl(key: string) {
@@ -43,7 +44,7 @@ class UserProfileImageService {
 
     const existingProfile = await userProfile.findByUserId(userId)
 
-    const key = this.buildS3Key(userId)
+    const key = this.buildS3Key(userId, file)
 
     if (existingProfile?.profilePicture && this.isOurS3File(existingProfile.profilePicture)) {
       await s3Client.send(
