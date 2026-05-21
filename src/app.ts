@@ -11,6 +11,7 @@ import { notFoundHandler } from './middlewares/notFound'
 import authRoutes from './routes/auth.routes'
 import byokRoutes from './routes/byok.routes'
 import healthRoutes from './routes/health.routes'
+import integrationRoutes from './routes/integrations.routes'
 import quizRoutes from './routes/quiz.routes'
 import uploadRoutes from './routes/upload.routes'
 import userProfileRoutes from './routes/userProfile.routes'
@@ -32,6 +33,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 app.use(authRoutes)
 app.use(userProfileRoutes)
+app.use(integrationRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)

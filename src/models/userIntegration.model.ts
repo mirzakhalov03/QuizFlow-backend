@@ -48,6 +48,23 @@ export default class UserIntegrations {
       newUserIntegrations.updatedAt,
     )
   }
+  static async findAllByUserId(userId: string): Promise<UserIntegrations[]> {
+    const rows = await db.select().from(userIntegrations).where(eq(userIntegrations.userId, userId))
+
+    return rows.map(
+      (row) =>
+        new UserIntegrations(
+          row.id,
+          row.userId,
+          row.accessToken,
+          row.refreshToken,
+          row.provider,
+          row.createdAt,
+          row.updatedAt,
+        ),
+    )
+  }
+
   static async findByUserIdAndProvider(userId: string, provider: string) {
     const row = await db
       .select()
@@ -81,6 +98,12 @@ export default class UserIntegrations {
         ...data,
         updatedAt: new Date(),
       })
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, provider)))
+  }
+
+  static async deleteByUserIdAndProvider(userId: string, provider: string): Promise<void> {
+    await db
+      .delete(userIntegrations)
       .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, provider)))
   }
 }

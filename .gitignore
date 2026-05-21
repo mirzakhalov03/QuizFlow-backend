@@ -16,6 +16,7 @@ dist-ssr
 bin
 progress.md
 claude.md
+.claude
 scripts
 
 # Editor directories and files

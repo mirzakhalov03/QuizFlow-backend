@@ -112,6 +112,37 @@ export const GetQuizzesSchema = z.object({
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
 
+export const GenerateQuizFromNotionSchema = z
+  .object({
+    pageId: z.string().min(1, 'pageId is required'),
+
+    title: z.string().min(1).max(200).optional(),
+
+    userInstructions: z.string().max(1000).optional(),
+
+    isTimerEnabled: z.boolean().optional(),
+
+    timerDuration: z.coerce
+      .number()
+      .int()
+      .positive('timerDuration must be a positive integer')
+      .optional(),
+
+    type: QuestionTypeEnum.optional(),
+
+    questionCount: z.coerce.number().int().min(1).max(30).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isTimerEnabled && !data.timerDuration) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['timerDuration'],
+        message: 'timerDuration is required when isTimerEnabled is true',
+      })
+    }
+  })
+
+export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
 export const SubmitQuizSchema = z.object({
   answers: z
     .array(

@@ -1,7 +1,3 @@
-import { eq, and } from 'drizzle-orm'
-
-import { db } from '../database/database'
-import { userIntegrations } from '../database/schema'
 import UserIntegrations from '../models/userIntegration.model'
 
 type GoogleTokenResponse = {
@@ -23,31 +19,38 @@ class IntegrationService {
       })
     }
 
-    return await db
-      .update(userIntegrations)
-      .set({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? existing.refreshToken,
-      })
-      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, 'google')))
+    return await UserIntegrations.updateByUserIdAndProvider(userId, 'google', {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? existing.refreshToken,
+    })
   }
 
-  async upsertNotion(userId: string, accessToken: string) {
-    const existing = await UserIntegrations.findByUserIdAndProvider(userId, 'notion')
+  async getIntegrations(userId: string) {
+    const integrations = await UserIntegrations.findAllByUserId(userId)
+    return integrations.map(({ id, provider, createdAt, updatedAt }) => ({
+      id,
+      provider,
+      createdAt,
+      updatedAt,
+    }))
+  }
+
+  async getIntegration(userId: string, provider: string) {
+    const integration = await UserIntegrations.findByUserIdAndProvider(userId, provider)
+    if (!integration) return null
+    const { id, createdAt, updatedAt } = integration
+    return { id, provider, createdAt, updatedAt }
+  }
+
+  async deleteIntegration(userId: string, provider: string) {
+    const existing = await UserIntegrations.findByUserIdAndProvider(userId, provider)
 
     if (!existing) {
-      return await UserIntegrations.createUser({
-        userId,
-        accessToken,
-        refreshToken: '',
-        provider: 'notion',
-      })
+      return false
     }
 
-    return await db
-      .update(userIntegrations)
-      .set({ accessToken })
-      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, 'notion')))
+    await UserIntegrations.deleteByUserIdAndProvider(userId, provider)
+    return true
   }
 }
 
