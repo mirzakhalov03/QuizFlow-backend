@@ -59,7 +59,7 @@ class NotionQuizService {
       // 4. Invoke quiz generator Lambda with S3 location
       const jobId = await invokeQuizGenerator({
         bucket: s3BucketName,
-        key,
+        keys: [key],
         userId: input.userId,
         title: input.title,
         userInstructions: input.userInstructions,
