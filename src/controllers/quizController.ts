@@ -61,7 +61,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       resolvedKeys = resolvedKey ? [resolvedKey] : []
     }
 
-    const bio = await profileService.getProfileBio(userId)
+    const userBio = await profileService.getProfileBio(userId)
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       keys: resolvedKeys,
@@ -73,7 +73,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
-      userBio: bio,
+      userBio,
     })
 
     res.status(202).json(
