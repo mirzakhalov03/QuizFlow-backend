@@ -1,5 +1,3 @@
-import { profile } from 'node:console'
-
 import { eq } from 'drizzle-orm'
 
 import { db } from '../database/database'
