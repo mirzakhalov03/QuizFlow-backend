@@ -114,11 +114,14 @@ const buildSystemPrompt = (
     '## Grounding',
     '- Every question and every answer must be directly supported by the source material.',
     '- Do not introduce facts, definitions, or claims that are not present in the source.',
-    '',
-    userBio &&
-      `## User profile context
-    - The following is the profile bio of the user requesting the quiz. Use this to tailor the terminology, complexity to their background: ${userBio}
-    `,
+    ...(userBio
+      ? [
+          '',
+          '## User profile context',
+          '- The following is the profile bio of the user requesting the quiz. Use this to tailor the terminology, complexity to their background: ' +
+            userBio,
+        ]
+      : []),
   ].join('\n')
 }
 
