@@ -74,7 +74,6 @@ export const PatchQuizSchema = z
     isTimerEnabled: z.boolean().optional(),
     timerDuration: z.coerce.number().int().positive().nullable().optional(),
     type: QuestionTypeEnum.optional(),
-    isPublic: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     const hasAnyField = Object.values(data).some((v) => v !== undefined)

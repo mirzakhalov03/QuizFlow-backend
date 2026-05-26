@@ -5,6 +5,7 @@ import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
+import { getPublicQuizByToken } from '../services/quiz.service'
 import {
   deleteQuizById,
   getJobById,
@@ -124,6 +125,23 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   }
 }
 
+export const getPublicQuizController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawToken = req.params.shareToken
+    const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
+
+    if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
+
+    const quiz = await getPublicQuizByToken(shareToken)
+
+    if (!quiz) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
+
+    res.status(200).json(successResponse('Public quiz retrieved successfully', quiz))
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const getQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
@@ -155,7 +173,7 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
 
-    const { title, userInstructions, isTimerEnabled, timerDuration, type, isPublic } =
+    const { title, userInstructions, isTimerEnabled, timerDuration, type } =
       req.body as PatchQuizInput
 
     const updatedQuiz = await updateQuizById(
@@ -166,7 +184,6 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
         isTimerEnabled,
         timerDuration: isTimerEnabled === false ? null : (timerDuration ?? undefined),
         type,
-        isPublic,
       },
       userId,
     )

@@ -4,6 +4,7 @@ import {
   deleteQuizByIdController,
   generateQuizController,
   getJobStatusController,
+  getPublicQuizController,
   getQuizByIdController,
   getQuizzesController,
   patchQuizByIdController,
@@ -140,6 +141,27 @@ router.get('/quizzes', authMiddleware, validateQuery(GetQuizzesSchema), getQuizz
  */
 router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
 
+/**
+ * @openapi
+ * /quizzes/{shareToken}:
+ *  get:
+ *    tags:
+ *      - Quiz
+ *    summary: Retrieve a public quiz by its share token
+ *    parameters:
+ *      - in: path
+ *        name: shareToken
+ *        required: true
+ *        schema:
+ *          type: string
+ *          format: uuid
+ *    responses:
+ *      200:
+ *        description: Public quiz retrieved (without answers)
+ *      404:
+ *        description: Quiz not found ot not public
+ */
+router.get('/quizzes/:shareToken', getPublicQuizController)
 /**
  * @openapi
  * /quizzes/{id}:

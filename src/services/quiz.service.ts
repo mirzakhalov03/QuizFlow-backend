@@ -10,6 +10,7 @@ import {
   userAnswers,
 } from '../database/schema'
 import { AppError } from '../helpers/AppError'
+import { QUIZ_FILE_MAX_BYTES } from '../helpers/utils/quizLambdaUtils'
 import type { QuestionType } from '../types/questionTypes'
 
 type GetQuizzesParams = {
@@ -26,7 +27,6 @@ type UpdateQuizInput = {
   isTimerEnabled?: boolean
   timerDuration?: number | null
   type?: QuestionType | null
-  isPublic?: boolean
 }
 
 /**
@@ -116,7 +116,6 @@ export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: 
       isTimerEnabled: data.isTimerEnabled,
       timerDuration: data.timerDuration,
       type: data.type,
-      isPublic: data.isPublic,
     })
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
     .returning()
@@ -277,4 +276,46 @@ export const getJobById = async (jobId: string, userId: string) => {
     .limit(1)
 
   return job ?? null
+}
+
+export const getPublicQuizByToken = async (shareToken: string) => {
+  const [quiz] = await db
+    .select()
+    .from(quizzes)
+    .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
+    .limit(1)
+
+  if (!quiz) return null
+
+  const questionRows = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.quizId, quiz.id))
+    .orderBy(questions.position)
+
+  const questionIds = questionRows.map((q) => q.id)
+
+  const optionRows =
+    questionIds.length > 0
+      ? await db
+          .select({
+            id: questionOptions.id,
+            questionId: questionOptions.questionId,
+            text: questionOptions.text,
+            position: questionOptions.position,
+          })
+          .from(questionOptions)
+          .where(inArray(questionOptions.questionId, questionIds))
+          .orderBy(questionOptions.position)
+      : []
+  const optionsByQuestion = optionRows.reduce<Record<string, typeof optionRows>>((acc, option) => {
+    if (!acc[option.questionId]) acc[option.questionId] = []
+    acc[option.questionId].push(option)
+    return acc
+  }, {})
+
+  return {
+    ...quiz,
+    questions: questionRows.map((q) => ({ ...q, options: optionsByQuestion[q.id] ?? [] })),
+  }
 }
