@@ -155,7 +155,7 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
       throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
     }
 
-    const { title, userInstructions, isTimerEnabled, timerDuration, type } =
+    const { title, userInstructions, isTimerEnabled, timerDuration, type, isPublic } =
       req.body as PatchQuizInput
 
     const updatedQuiz = await updateQuizById(
@@ -166,6 +166,7 @@ export const patchQuizByIdController = async (req: Request, res: Response, next:
         isTimerEnabled,
         timerDuration: isTimerEnabled === false ? null : (timerDuration ?? undefined),
         type,
+        isPublic,
       },
       userId,
     )

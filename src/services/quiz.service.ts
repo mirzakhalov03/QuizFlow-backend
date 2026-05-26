@@ -26,6 +26,7 @@ type UpdateQuizInput = {
   isTimerEnabled?: boolean
   timerDuration?: number | null
   type?: QuestionType | null
+  isPublic?: boolean
 }
 
 /**
@@ -115,6 +116,7 @@ export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: 
       isTimerEnabled: data.isTimerEnabled,
       timerDuration: data.timerDuration,
       type: data.type,
+      isPublic: data.isPublic,
     })
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
     .returning()
