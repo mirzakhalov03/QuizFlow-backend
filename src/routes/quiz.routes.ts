@@ -2,6 +2,8 @@ import { Router } from 'express'
 
 import {
   deleteQuizByIdController,
+  disableSharingController,
+  enableSharingController,
   generateQuizController,
   getJobStatusController,
   getPublicQuizController,
@@ -161,7 +163,7 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
  *      404:
  *        description: Quiz not found ot not public
  */
-router.get('/quizzes/:shareToken', getPublicQuizController)
+router.get('/public/quizzes/:shareToken', getPublicQuizController)
 /**
  * @openapi
  * /quizzes/{id}:
@@ -195,6 +197,26 @@ router.get('/quizzes/:shareToken', getPublicQuizController)
  *         description: Quiz not found
  */
 router.patch('/quizzes/:id', authMiddleware, validate(PatchQuizSchema), patchQuizByIdController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/share/enable:
+ *   patch:
+ *     tags: [Quiz]
+ *     security: [{ cookieAuth: [] }]
+ *     summary: Enable public sharing for a quiz
+ */
+router.patch('/quizzes/:id/share/enable', authMiddleware, enableSharingController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/share/disable:
+ *   patch:
+ *     tags: [Quiz]
+ *     security: [{ cookieAuth: [] }]
+ *     summary: Disable public sharing for a quiz
+ */
+router.patch('/quizzes/:id/share/disable', authMiddleware, disableSharingController)
 
 /**
  * @openapi

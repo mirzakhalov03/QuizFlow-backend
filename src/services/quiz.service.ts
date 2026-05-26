@@ -319,3 +319,19 @@ export const getPublicQuizByToken = async (shareToken: string) => {
     questions: questionRows.map((q) => ({ ...q, options: optionsByQuestion[q.id] ?? [] })),
   }
 }
+export const setQuizSharing = async (id: string, userId: string, isPublic: boolean) => {
+  const [updatedQuiz] = await db
+    .update(quizzes)
+    .set({
+      isPublic,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
+    .returning({
+      id: quizzes.id,
+      isPublic: quizzes.isPublic,
+      shareToken: quizzes.shareToken,
+    })
+
+  return updatedQuiz ?? null
+}
