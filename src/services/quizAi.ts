@@ -29,7 +29,7 @@ type GenerateOptions = {
   userInstructions?: string
   defaultTitle?: string
   model?: string
-  userBio?: string
+  userBio?: string | null
 }
 
 const buildSchema = (type?: QuestionType) => ({

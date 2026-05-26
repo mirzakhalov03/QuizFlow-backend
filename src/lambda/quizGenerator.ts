@@ -32,7 +32,7 @@ type LambdaEvent = {
   questionCount?: number
   model?: string
   quiz?: AiQuiz
-  userBio?: string
+  userBio?: string | null
 }
 
 const persistQuiz = async (
