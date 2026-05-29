@@ -9,7 +9,7 @@ export const GenerateQuizSchema = z
   .object({
     /** Notion page IDs — required when source=notion, supports multiple pages */
     pageIds: z
-      .union([z.array(z.string().min(1)), z.string().min(1)])
+      .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
       .transform((val) => (Array.isArray(val) ? val : [val]))
       .optional(),
 

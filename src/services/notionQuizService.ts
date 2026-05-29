@@ -25,8 +25,9 @@ class NotionQuizService {
   async generateQuizFromNotionPage(input: GenerateQuizFromNotionInput) {
     try {
       // 1. Fetch content from all pages in parallel
+      const uniquePageIds = [...new Set(input.pageIds)]
       const pageContents = await Promise.all(
-        input.pageIds.map((pageId) => notionService.getPageContent(input.userId, pageId)),
+        uniquePageIds.map((pageId) => notionService.getPageContent(input.userId, pageId)),
       )
 
       const notionContent = pageContents.filter((c) => c.trim().length > 0).join('\n\n---\n\n')

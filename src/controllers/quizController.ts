@@ -24,7 +24,7 @@ import type {
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
-    const source = (req.query.source as string) ?? 'file'
+    const source = typeof req.query.source === 'string' ? req.query.source : 'file'
 
     const {
       pageIds,
