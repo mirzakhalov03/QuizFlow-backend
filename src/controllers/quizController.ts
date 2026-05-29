@@ -5,6 +5,7 @@ import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
+import notionQuizService from '../services/notionQuizService'
 import {
   deleteQuizById,
   getJobById,
@@ -23,8 +24,10 @@ import type {
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
+    const source = (req.query.source as string) ?? 'file'
 
     const {
+      pageIds,
       s3Url,
       bucket,
       key,
@@ -38,6 +41,26 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       model,
     } = req.body as GenerateQuizInput
 
+    if (source === 'notion') {
+      if (!pageIds || pageIds.length === 0) {
+        throw new AppError('pageIds is required for source=notion', 400, 'VALIDATION_ERROR')
+      }
+
+      const result = await notionQuizService.generateQuizFromNotionPage({
+        userId,
+        pageIds,
+        title,
+        userInstructions,
+        isTimerEnabled: Boolean(isTimerEnabled),
+        timerDuration,
+        type,
+        questionCount,
+      })
+
+      return res.status(202).json(successResponse('Quiz generation started', result))
+    }
+
+    // source === 'file' (default)
     let resolvedBucket = bucket
     let resolvedKey = key
     let resolvedKeys = keys
@@ -55,9 +78,16 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       }
     }
 
-    // Normalise to keys array: prefer explicit keys, else wrap single key
     if (!resolvedKeys || resolvedKeys.length === 0) {
       resolvedKeys = resolvedKey ? [resolvedKey] : []
+    }
+
+    if (resolvedKeys.length === 0) {
+      throw new AppError(
+        'Either s3Url, key, or keys is required for source=file',
+        400,
+        'VALIDATION_ERROR',
+      )
     }
 
     const jobId = await invokeQuizGenerator({
@@ -73,7 +103,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       model,
     })
 
-    res.status(202).json(
+    return res.status(202).json(
       successResponse('Quiz generation started', {
         jobId,
         pollUrl: `/quizzes/jobs/${jobId}`,
