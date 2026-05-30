@@ -65,7 +65,7 @@ router.get('/byok', authMiddleware, listByokController)
 /**
  * @openapi
  * /byok/{id}:
- *   put:
+ *   patch:
  *     tags:
  *       - BYOK
  *     security:
@@ -99,7 +99,7 @@ router.get('/byok', authMiddleware, listByokController)
  *       404:
  *         description: API key not found
  */
-router.put('/byok/:id', authMiddleware, validate(UpdateByokSchema), updateByokController)
+router.patch('/byok/:id', authMiddleware, validate(UpdateByokSchema), updateByokController)
 
 /**
  * @openapi
