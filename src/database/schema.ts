@@ -69,6 +69,7 @@ export const userApiKeys = pgTable('user_api_keys', {
     .references(() => users.id, { onDelete: 'cascade' }),
   keyName: text('key_name').notNull(),
   keyValue: text('key_value').notNull(),
+  provider: text('provider').notNull(),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()

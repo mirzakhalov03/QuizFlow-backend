@@ -18,17 +18,23 @@ type UpdateInput = {
 const toSafeView = (row: typeof userApiKeys.$inferSelect) => ({
   id: row.id,
   keyName: row.keyName,
+  provider: row.provider,
   maskedKey: maskApiKeyValue(decryptApiKeyValue(row.keyValue)),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 })
 
-export const createByok = async ({ userId, keyName, keyValue }: CreateInput) => {
+export const createByok = async ({
+  userId,
+  keyName,
+  keyValue,
+  provider,
+}: CreateInput & { provider: string }) => {
   const encryptedValue = encryptApiKeyValue(keyValue)
 
   const [row] = await db
     .insert(userApiKeys)
-    .values({ userId, keyName, keyValue: encryptedValue })
+    .values({ userId, keyName, keyValue: encryptedValue, provider })
     .returning()
 
   return toSafeView(row)
@@ -44,10 +50,15 @@ export const listByok = async (userId: string) => {
   return rows.map(toSafeView)
 }
 
-export const updateByok = async (id: string, userId: string, data: UpdateInput) => {
-  const updatePayload: { keyName?: string; keyValue?: string } = {}
+export const updateByok = async (
+  id: string,
+  userId: string,
+  data: UpdateInput & { provider?: string },
+) => {
+  const updatePayload: { keyName?: string; keyValue?: string; provider?: string } = {}
   if (data.keyName !== undefined) updatePayload.keyName = data.keyName
   if (data.keyValue !== undefined) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+  if (data.provider !== undefined) updatePayload.provider = data.provider
 
   const [row] = await db
     .update(userApiKeys)
