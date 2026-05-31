@@ -10,7 +10,6 @@ import {
   userAnswers,
 } from '../database/schema'
 import { AppError } from '../helpers/AppError'
-import { QUIZ_FILE_MAX_BYTES } from '../helpers/utils/quizLambdaUtils'
 import type { QuestionType } from '../types/questionTypes'
 
 type GetQuizzesParams = {
