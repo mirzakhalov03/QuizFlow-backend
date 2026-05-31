@@ -145,7 +145,7 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
 
 /**
  * @openapi
- * /quizzes/{shareToken}:
+ * /public/quizzes/{shareToken}:
  *  get:
  *    tags:
  *      - Quiz
@@ -161,7 +161,7 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
  *      200:
  *        description: Public quiz retrieved (without answers)
  *      404:
- *        description: Quiz not found ot not public
+ *        description: Quiz not found or not public
  */
 router.get('/public/quizzes/:shareToken', getPublicQuizController)
 /**
