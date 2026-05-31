@@ -258,7 +258,7 @@ export const disableSharingController = async (req: Request, res: Response, next
       throw new AppError('Quiz not found', 404, 'NOT_FOUND')
     }
 
-    res.status(200).json(successResponse('Sharing enabled successfully', result))
+    res.status(200).json(successResponse('Sharing disabled successfully', result))
   } catch (error) {
     next(error)
   }
