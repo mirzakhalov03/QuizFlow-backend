@@ -324,6 +324,9 @@ export const setQuizSharing = async (id: string, userId: string, isPublic: boole
     .update(quizzes)
     .set({
       isPublic,
+      shareToken: isPublic
+        ? sql.raw('COALESCE(share_token, gen_random_uuid()::text)')
+        : quizzes.shareToken,
       updatedAt: new Date(),
     })
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
