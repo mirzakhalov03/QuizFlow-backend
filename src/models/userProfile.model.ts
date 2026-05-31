@@ -128,7 +128,6 @@ export default class userProfile {
       .select({ bio: userProfiles.bio })
       .from(userProfiles)
       .where(eq(userProfiles.userId, userId))
-      .limit(1)
 
     return profile?.bio
   }
