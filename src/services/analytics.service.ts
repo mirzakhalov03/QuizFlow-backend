@@ -56,7 +56,10 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
 
   const byDay = new Map<string, { sum: number; count: number }>()
   for (const r of gradedRows) {
-    const date = r.createdAt.toISOString().slice(0, 10)
+    const y = r.createdAt.getFullYear()
+    const m = String(r.createdAt.getMonth() + 1).padStart(2, '0')
+    const d = String(r.createdAt.getDate()).padStart(2, '0')
+    const date = `${y}-${m}-${d}`
     const entry = byDay.get(date) ?? { sum: 0, count: 0 }
     entry.sum += toPercent(r.correctAnswers, r.totalQuestions)
     entry.count += 1
