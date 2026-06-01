@@ -44,9 +44,9 @@ export const updateByokController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
     const id = getIdParam(req)
-    const { keyName, keyValue } = req.body as UpdateByokInput
+    const { keyName, keyValue, provider } = req.body as UpdateByokInput
 
-    const updated = await updateByok(id, userId, { keyName, keyValue })
+    const updated = await updateByok(id, userId, { keyName, keyValue, provider })
     if (!updated) {
       throw new AppError('API key not found', 404, 'NOT_FOUND')
     }

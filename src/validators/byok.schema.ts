@@ -15,7 +15,9 @@ export const UpdateByokSchema = z
     provider: z.string().trim().min(1).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.keyName === undefined && data.keyValue === undefined && data.provider === undefined) {
+    const { keyName, keyValue, provider } = data
+
+    if (!keyName && !keyValue && !provider) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [],

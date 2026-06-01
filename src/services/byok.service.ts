@@ -34,7 +34,7 @@ export const createByok = async ({
 
   const [row] = await db
     .insert(userApiKeys)
-    .values({ userId, keyName, keyValue: encryptedValue, provider })
+    .values({ userId, keyName, provider, keyValue: encryptedValue })
     .returning()
 
   return toSafeView(row)
@@ -56,9 +56,9 @@ export const updateByok = async (
   data: UpdateInput & { provider?: string },
 ) => {
   const updatePayload: { keyName?: string; keyValue?: string; provider?: string } = {}
-  if (data.keyName !== undefined) updatePayload.keyName = data.keyName
-  if (data.keyValue !== undefined) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
-  if (data.provider !== undefined) updatePayload.provider = data.provider
+  if (data.keyName) updatePayload.keyName = data.keyName
+  if (data.keyValue) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+  if (data.provider) updatePayload.provider = data.provider
 
   const [row] = await db
     .update(userApiKeys)

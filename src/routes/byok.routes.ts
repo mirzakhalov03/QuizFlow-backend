@@ -30,10 +30,13 @@ const router = Router()
  *             required:
  *               - keyName
  *               - keyValue
+ *               - provider
  *             properties:
  *               keyName:
  *                 type: string
  *               keyValue:
+ *                 type: string
+ *               provider:
  *                 type: string
  *     responses:
  *       201:
@@ -70,7 +73,7 @@ router.get('/byok', authMiddleware, listByokController)
  *       - BYOK
  *     security:
  *       - cookieAuth: []
- *     summary: Update an API key's name and/or value
+ *     summary: Update an API key's name, value and/or provider
  *     parameters:
  *       - in: path
  *         name: id
@@ -88,6 +91,8 @@ router.get('/byok', authMiddleware, listByokController)
  *               keyName:
  *                 type: string
  *               keyValue:
+ *                 type: string
+ *               provider:
  *                 type: string
  *     responses:
  *       200:
