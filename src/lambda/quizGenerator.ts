@@ -32,6 +32,7 @@ type LambdaEvent = {
   questionCount?: number
   model?: string
   quiz?: AiQuiz
+  userBio?: string | null
 }
 
 const persistQuiz = async (
@@ -130,6 +131,7 @@ export const handler = async (event: LambdaEvent) => {
         questionCount: event.questionCount,
         type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
         userInstructions: event.userInstructions,
+        userBio: event.userBio,
         defaultTitle: event.title,
         model: event.model,
       }))

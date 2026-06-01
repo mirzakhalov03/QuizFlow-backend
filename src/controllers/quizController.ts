@@ -5,6 +5,7 @@ import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
+import profileService from '../services/profileService'
 import {
   deleteQuizById,
   getJobById,
@@ -60,6 +61,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       resolvedKeys = resolvedKey ? [resolvedKey] : []
     }
 
+    const userBio = await profileService.getProfileBio(userId)
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       keys: resolvedKeys,
@@ -71,6 +73,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
+      userBio,
     })
 
     res.status(202).json(

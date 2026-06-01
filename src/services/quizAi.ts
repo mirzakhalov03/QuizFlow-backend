@@ -29,6 +29,7 @@ type GenerateOptions = {
   userInstructions?: string
   defaultTitle?: string
   model?: string
+  userBio?: string | null
 }
 
 const buildSchema = (type?: QuestionType) => ({
@@ -72,7 +73,11 @@ const buildSchema = (type?: QuestionType) => ({
   },
 })
 
-const buildSystemPrompt = (type: QuestionType | undefined, count: number) => {
+const buildSystemPrompt = (
+  type: QuestionType | undefined,
+  count: number,
+  userBio?: string | null,
+) => {
   const typeRule = type
     ? `Every question MUST be of type "${type}".`
     : `Pick the most appropriate type per question from: ${QUESTION_TYPES.join(', ')}. Vary the types across the quiz — do not use the same type for every question.`
@@ -109,6 +114,14 @@ const buildSystemPrompt = (type: QuestionType | undefined, count: number) => {
     '## Grounding',
     '- Every question and every answer must be directly supported by the source material.',
     '- Do not introduce facts, definitions, or claims that are not present in the source.',
+    ...(userBio
+      ? [
+          '',
+          '## User profile context',
+          '- The following is the profile bio of the user requesting the quiz. Use this to tailor the terminology, complexity to their background: ' +
+            userBio,
+        ]
+      : []),
   ].join('\n')
 }
 
@@ -119,6 +132,7 @@ export const generateQuizFromText = async ({
   userInstructions,
   defaultTitle,
   model,
+  userBio,
 }: GenerateOptions): Promise<AiQuiz> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -143,7 +157,7 @@ export const generateQuizFromText = async ({
     schema: buildSchema(type),
     temperature: 0.3,
     messages: [
-      { role: 'system', content: buildSystemPrompt(type, count) },
+      { role: 'system', content: buildSystemPrompt(type, count, userBio) },
       { role: 'user', content: userParts.join('\n\n') },
     ],
   })
