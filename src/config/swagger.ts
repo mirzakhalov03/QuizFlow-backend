@@ -84,7 +84,9 @@ const options: swaggerJSDoc.Options = {
   },
   apis: [
     path.join(__dirname, '../app.ts').replace(/\\/g, '/'),
+    path.join(__dirname, '../app.js').replace(/\\/g, '/'),
     path.join(__dirname, '../routes/*.ts').replace(/\\/g, '/'),
+    path.join(__dirname, '../routes/*.js').replace(/\\/g, '/'),
   ],
 }
 
