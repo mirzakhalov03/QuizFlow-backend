@@ -15,6 +15,13 @@
       "when": 1780324300754,
       "tag": "0001_brave_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780334666018,
+      "tag": "0002_loud_the_executioner",
+      "breakpoints": true
     }
   ]
 }
