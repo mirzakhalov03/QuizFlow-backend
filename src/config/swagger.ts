@@ -25,6 +25,13 @@ const options: swaggerJSDoc.Options = {
       { name: 'Analytics', description: 'User quiz analytics' },
     ],
     components: {
+      securitySchemes: {
+        cookieAuth: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'accessToken',
+        },
+      },
       schemas: {
         ApiSuccessResponse: {
           type: 'object',
