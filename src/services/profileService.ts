@@ -19,6 +19,10 @@ class ProfileService {
       profilePicture: profile.picture ?? null,
     })
   }
+
+  async getProfileBio(userId: string) {
+    return await userProfile.fetchUserBio(userId)
+  }
 }
 
 export default new ProfileService()

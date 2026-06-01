@@ -2,6 +2,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { Client } from 'pg'
 
 import * as schema from '../database/schema'
+import { getDatabaseRejectUnauthorized } from '../helpers/utils/dbSsl'
 
 /**
  * Lambda-local database client using a single pg.Client (not Pool).
@@ -35,7 +36,7 @@ export const getLambdaDb = async (): Promise<DrizzleDb> => {
     connectionString,
     ssl: sslEnabled
       ? {
-          rejectUnauthorized: false,
+          rejectUnauthorized: getDatabaseRejectUnauthorized(),
         }
       : undefined,
   })
