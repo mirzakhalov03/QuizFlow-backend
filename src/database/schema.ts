@@ -40,6 +40,8 @@ export const userProfiles = pgTable('user_profiles', {
   bio: text('bio'),
   profilePicture: text('profile_picture'),
   isOnboarded: boolean('is_onboarded').notNull().default(false),
+  aiFeedback: jsonb('ai_feedback'),
+  aiFeedbackGeneratedAt: timestamp('ai_feedback_generated_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
