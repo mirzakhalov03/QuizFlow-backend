@@ -47,36 +47,41 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }
   }
 
-  const gradedRows = rows.filter((r) => r.totalQuestions > 0)
-
-  const averageScore = gradedRows.length
-    ? gradedRows.reduce((sum, r) => sum + toPercent(r.correctAnswers, r.totalQuestions), 0) /
-      gradedRows.length
-    : 0
-
+  let gradedScoreSum = 0
+  let gradedCount = 0
   const byDay = new Map<string, { sum: number; count: number }>()
-  for (const r of gradedRows) {
+  const byType = new Map<QuestionType, { sum: number; count: number }>()
+
+  for (const r of rows) {
+    if (r.totalQuestions <= 0) continue
+
+    const percent = toPercent(r.correctAnswers, r.totalQuestions)
+    gradedScoreSum += percent
+    gradedCount += 1
+
     const y = r.createdAt.getFullYear()
     const m = String(r.createdAt.getMonth() + 1).padStart(2, '0')
     const d = String(r.createdAt.getDate()).padStart(2, '0')
     const date = `${y}-${m}-${d}`
-    const entry = byDay.get(date) ?? { sum: 0, count: 0 }
-    entry.sum += toPercent(r.correctAnswers, r.totalQuestions)
-    entry.count += 1
-    byDay.set(date, entry)
+    const dayEntry = byDay.get(date) ?? { sum: 0, count: 0 }
+    dayEntry.sum += percent
+    dayEntry.count += 1
+    byDay.set(date, dayEntry)
+
+    if (r.quizType) {
+      const typeEntry = byType.get(r.quizType) ?? { sum: 0, count: 0 }
+      typeEntry.sum += percent
+      typeEntry.count += 1
+      byType.set(r.quizType, typeEntry)
+    }
   }
+
+  const averageScore = gradedCount > 0 ? gradedScoreSum / gradedCount : 0
+
   const scoreOverTime: ScorePoint[] = Array.from(byDay.entries())
     .map(([date, { sum, count }]) => ({ date, score: round(sum / count) }))
     .sort((a, b) => a.date.localeCompare(b.date))
 
-  const byType = new Map<QuestionType, { sum: number; count: number }>()
-  for (const r of gradedRows) {
-    if (!r.quizType) continue
-    const entry = byType.get(r.quizType) ?? { sum: 0, count: 0 }
-    entry.sum += toPercent(r.correctAnswers, r.totalQuestions)
-    entry.count += 1
-    byType.set(r.quizType, entry)
-  }
   const breakdownByType: TypeBreakdown[] = Array.from(byType.entries()).map(
     ([type, { sum, count }]) => ({
       type,
