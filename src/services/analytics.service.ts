@@ -88,7 +88,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   )
 
   return {
-    totalQuizzesTaken: rows.length,
+    totalQuizzesTaken: gradedCount,
     averageScore: round(averageScore),
     scoreOverTime,
     breakdownByType,
