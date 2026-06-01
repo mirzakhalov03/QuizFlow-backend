@@ -59,10 +59,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     gradedScoreSum += percent
     gradedCount += 1
 
-    const y = r.createdAt.getFullYear()
-    const m = String(r.createdAt.getMonth() + 1).padStart(2, '0')
-    const d = String(r.createdAt.getDate()).padStart(2, '0')
-    const date = `${y}-${m}-${d}`
+    const date = r.createdAt.toISOString().slice(0, 10)
     const dayEntry = byDay.get(date) ?? { sum: 0, count: 0 }
     dayEntry.sum += percent
     dayEntry.count += 1
