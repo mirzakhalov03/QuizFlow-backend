@@ -22,6 +22,7 @@ const options: swaggerJSDoc.Options = {
       { name: 'Health', description: 'Health and readiness checks' },
       { name: 'Upload', description: 'File upload APIs' },
       { name: 'Quiz', description: 'Quiz generation and CRUD APIs' },
+      { name: 'Analytics', description: 'User quiz analytics' },
     ],
     components: {
       schemas: {
@@ -81,7 +82,10 @@ const options: swaggerJSDoc.Options = {
       },
     },
   },
-  apis: [path.join(__dirname, '../app.ts'), path.join(__dirname, '../routes/*.ts')],
+  apis: [
+    path.join(__dirname, '../app.ts').replace(/\\/g, '/'),
+    path.join(__dirname, '../routes/*.ts').replace(/\\/g, '/'),
+  ],
 }
 
 export const swaggerSpec = swaggerJSDoc(options)
