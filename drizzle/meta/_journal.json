@@ -71,6 +71,20 @@
       "when": 1779197606038,
       "tag": "0009_cloudy_kinsey_walden",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779708799227,
+      "tag": "0010_abnormal_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780376416078,
+      "tag": "0011_far_shotgun",
+      "breakpoints": true
     }
   ]
 }

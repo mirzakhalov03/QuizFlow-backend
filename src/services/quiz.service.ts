@@ -47,6 +47,7 @@ export const getQuizzes = async ({ userId, limit = 20, offset = 0, search }: Get
       isTimerEnabled: quizzes.isTimerEnabled,
       timerDuration: quizzes.timerDuration,
       userInstructions: quizzes.userInstructions,
+      tokenUsage: quizzes.tokenUsage,
       completedAt: quizzes.completedAt,
       createdAt: quizzes.createdAt,
       uploadedAt: quizzes.uploadedAt,

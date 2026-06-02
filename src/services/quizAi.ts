@@ -1,7 +1,10 @@
+import OpenAI from 'openai'
+
 import { chatJSON } from './openRouter'
 import { DEFAULT_MODEL } from '../constants/models'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
+
 const SOURCE_TEXT_LIMIT = 50_000
 const DEFAULT_QUESTION_COUNT = 5
 
@@ -20,6 +23,11 @@ export type AiQuestion = {
 export type AiQuiz = {
   title: string
   questions: AiQuestion[]
+}
+
+export type AiQuizResult = {
+  quiz: AiQuiz
+  usage?: OpenAI.CompletionUsage
 }
 
 type GenerateOptions = {
@@ -119,7 +127,7 @@ export const generateQuizFromText = async ({
   userInstructions,
   defaultTitle,
   model,
-}: GenerateOptions): Promise<AiQuiz> => {
+}: GenerateOptions): Promise<AiQuizResult> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
 
@@ -138,7 +146,7 @@ export const generateQuizFromText = async ({
     userParts.push(`Suggested title (you may improve it): ${defaultTitle}`)
   }
 
-  return chatJSON<AiQuiz>({
+  const result = await chatJSON<AiQuiz>({
     model: model ?? DEFAULT_MODEL,
     schema: buildSchema(type),
     temperature: 0.3,
@@ -147,4 +155,9 @@ export const generateQuizFromText = async ({
       { role: 'user', content: userParts.join('\n\n') },
     ],
   })
+
+  return {
+    quiz: result.data,
+    usage: result.usage,
+  }
 }
