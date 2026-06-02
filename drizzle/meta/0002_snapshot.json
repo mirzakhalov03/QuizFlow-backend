@@ -1,6 +1,6 @@
 {
-  "id": "ad7e41a9-856f-47c9-b52c-755b2eb3caf0",
-  "prevId": "5705df23-a513-4f8a-a1b1-fa39d5f7fd37",
+  "id": "e402aeec-cb84-4acb-a996-f35fc6a938bf",
+  "prevId": "86a8f09d-2058-4ad1-8269-8a31632b59d4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -414,6 +414,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_public": {
+          "name": "is_public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "share_token": {
+          "name": "share_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "properties": {
           "name": "properties",
           "type": "jsonb",
@@ -436,12 +449,6 @@
         "user_instructions": {
           "name": "user_instructions",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token_usage": {
-          "name": "token_usage",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -485,7 +492,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "quizzes_share_token_unique": {
+          "name": "quizzes_share_token_unique",
+          "nullsNotDistinct": false,
+          "columns": ["share_token"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -785,6 +798,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "ai_feedback": {
+          "name": "ai_feedback",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ai_feedback_generated_at": {
+          "name": "ai_feedback_generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
