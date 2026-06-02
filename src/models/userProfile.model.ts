@@ -9,6 +9,8 @@ export default class userProfile {
   bio: string | null
   profilePicture: string | null
   isOnboarded: boolean
+  aiFeedback: unknown | null
+  aiFeedbackGeneratedAt: Date | null
   createdAt: Date
   updatedAt: Date
 
@@ -18,6 +20,8 @@ export default class userProfile {
     bio: string | null,
     profilePicture: string | null,
     isOnboarded: boolean,
+    aiFeedback: unknown | null,
+    aiFeedbackGeneratedAt: Date | null,
     createdAt: Date,
     updatedAt: Date,
   ) {
@@ -26,6 +30,8 @@ export default class userProfile {
     this.bio = bio
     this.profilePicture = profilePicture
     this.isOnboarded = isOnboarded
+    this.aiFeedback = aiFeedback
+    this.aiFeedbackGeneratedAt = aiFeedbackGeneratedAt
     this.createdAt = createdAt
     this.updatedAt = updatedAt
   }
@@ -46,6 +52,8 @@ export default class userProfile {
       newUserProfile.bio,
       newUserProfile.profilePicture,
       newUserProfile.isOnboarded,
+      newUserProfile.aiFeedback,
+      newUserProfile.aiFeedbackGeneratedAt,
       newUserProfile.createdAt,
       newUserProfile.updatedAt,
     )
@@ -60,6 +68,8 @@ export default class userProfile {
       row.bio,
       row.profilePicture,
       row.isOnboarded,
+      row.aiFeedback,
+      row.aiFeedbackGeneratedAt,
       row.createdAt,
       row.updatedAt,
     )
@@ -80,6 +90,8 @@ export default class userProfile {
       row.bio,
       row.profilePicture,
       row.isOnboarded,
+      row.aiFeedback,
+      row.aiFeedbackGeneratedAt,
       row.createdAt,
       row.updatedAt,
     )
@@ -114,6 +126,8 @@ export default class userProfile {
       updated.bio,
       updated.profilePicture,
       updated.isOnboarded,
+      updated.aiFeedback,
+      updated.aiFeedbackGeneratedAt,
       updated.createdAt,
       updated.updatedAt,
     )
