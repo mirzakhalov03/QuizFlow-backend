@@ -18,9 +18,9 @@ const getIdParam = (req: Request): string => {
 export const createByokController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
-    const { keyName, keyValue } = req.body as CreateByokInput
+    const { keyName, keyValue, provider } = req.body as CreateByokInput
 
-    const created = await createByok({ userId, keyName, keyValue })
+    const created = await createByok({ userId, keyName, keyValue, provider })
 
     res.status(201).json(successResponse('API key created successfully', created))
   } catch (error) {
@@ -44,9 +44,9 @@ export const updateByokController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
     const id = getIdParam(req)
-    const { keyName, keyValue } = req.body as UpdateByokInput
+    const { keyName, keyValue, provider } = req.body as UpdateByokInput
 
-    const updated = await updateByok(id, userId, { keyName, keyValue })
+    const updated = await updateByok(id, userId, { keyName, keyValue, provider })
     if (!updated) {
       throw new AppError('API key not found', 404, 'NOT_FOUND')
     }

@@ -122,4 +122,13 @@ export default class userProfile {
   static async deleteByUserId(userId: string) {
     await db.delete(userProfiles).where(eq(userProfiles.userId, userId))
   }
+
+  static async fetchUserBio(userId: string) {
+    const [profile] = await db
+      .select({ bio: userProfiles.bio })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+
+    return profile?.bio
+  }
 }
