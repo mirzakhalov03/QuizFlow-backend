@@ -18,6 +18,7 @@ type QuizGeneratePayload = {
   type?: QuestionType
   questionCount?: number
   model?: string
+  userBio?: string | null
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env
