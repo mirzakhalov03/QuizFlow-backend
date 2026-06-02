@@ -24,7 +24,7 @@ import type {
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
-    const source = typeof req.query.source === 'string' ? req.query.source : 'file'
+    const source = (req.query as { source: string }).source
 
     const {
       pageIds,
@@ -51,10 +51,10 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         pageIds,
         title,
         userInstructions,
-        isTimerEnabled: Boolean(isTimerEnabled),
         timerDuration,
         type,
         questionCount,
+        isTimerEnabled: Boolean(isTimerEnabled),
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))

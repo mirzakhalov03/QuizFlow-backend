@@ -5,6 +5,10 @@ import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
 
+export const GenerateQuizSourceSchema = z.object({
+  source: z.enum(['file', 'notion']).default('file'),
+})
+
 export const GenerateQuizSchema = z
   .object({
     /** Notion page IDs — required when source=notion, supports multiple pages */
@@ -53,6 +57,17 @@ export const GenerateQuizSchema = z
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
   })
   .superRefine((data, ctx) => {
+    const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
+    const hasNotionSource = data.pageIds && data.pageIds.length > 0
+
+    if (!hasFileSource && !hasNotionSource) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['pageIds'],
+        message: 'Either pageIds (for notion) or s3Url/key/keys (for file) is required',
+      })
+    }
+
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
