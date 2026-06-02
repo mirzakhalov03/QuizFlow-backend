@@ -1,10 +1,11 @@
 import { z } from 'zod'
 
 import { SUPPORTED_MODELS } from '../constants/models'
+import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
-
+const DifficultyEnum = z.enum(DIFFICULTY_TYPES)
 export const GenerateQuizSchema = z
   .object({
     /** Full S3 URL (s3://bucket/key) or standard AWS HTTPS URL. Takes precedence over `bucket`+`key`. */
@@ -45,6 +46,8 @@ export const GenerateQuizSchema = z
 
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
+
+    difficulty: DifficultyEnum.optional(),
   })
   .superRefine((data, ctx) => {
     // Must have either s3Url, key, or keys

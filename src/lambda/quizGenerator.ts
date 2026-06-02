@@ -14,8 +14,8 @@ import {
 } from '../helpers/utils/quizLambdaUtils'
 import { generateQuizFromText } from '../services/quizAi'
 import type { AiQuiz, AiQuizResult } from '../services/quizAi'
+import type { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
-
 // Lambda-local clients — no Express app dependencies, no credential env vars required
 
 type LambdaEvent = {
@@ -33,6 +33,7 @@ type LambdaEvent = {
   model?: string
   quiz?: AiQuiz
   userBio?: string | null
+  difficulty?: DifficultyType
 }
 
 const persistQuiz = async (
@@ -63,6 +64,7 @@ const persistQuiz = async (
         userInstructions: event.userInstructions ?? null,
         tokenUsage: usage,
         uploadedAt: new Date(),
+        difficulty: event.difficulty,
       })
       .returning({ id: quizzes.id })
 
@@ -138,6 +140,7 @@ export const handler = async (event: LambdaEvent) => {
           userBio: event.userBio,
           defaultTitle: event.title,
           model: event.model,
+          difficulty: event.difficulty,
         })
 
     const quizRow = await persistQuiz(result, event, {
