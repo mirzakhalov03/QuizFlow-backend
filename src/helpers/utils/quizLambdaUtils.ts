@@ -1,5 +1,7 @@
 import type { Readable } from 'stream'
 
+import mammoth from 'mammoth'
+
 import type { QuestionType } from '../../types/questionTypes'
 
 /** Maximum file size allowed to be read from S3 for quiz generation (25 MB) */
@@ -79,14 +81,13 @@ const extractPdfText = (buffer: Buffer): Promise<string> => {
 }
 
 const extractDocxText = async (buffer: Buffer): Promise<string> => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mammoth = require('mammoth') as {
-    extractRawText(input: { buffer: Buffer }): Promise<{ value: string }>
-  }
-
   const { value } = await mammoth.extractRawText({ buffer })
   const trimmed = value.trim()
-  if (!trimmed) throw new Error('DOCX appears to be empty — no text could be extracted')
+
+  if (!trimmed) {
+    throw new Error('DOCX appears to be empty — no text could be extracted')
+  }
+
   return trimmed
 }
 
