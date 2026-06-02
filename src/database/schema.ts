@@ -99,8 +99,6 @@ export const quizzes = pgTable('quizzes', {
   timerDuration: integer('timer_duration'),
   userInstructions: text('user_instructions'),
   tokenUsage: jsonb('token_usage'),
-  isPublic: boolean('is_public').notNull().default(false),
-  shareToken: text('share_token').unique(),
   completedAt: timestamp('completed_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   uploadedAt: timestamp('uploaded_at', { mode: 'date' }),
