@@ -276,3 +276,64 @@ export const getJobById = async (jobId: string, userId: string) => {
 
   return job ?? null
 }
+
+export const getPublicQuizByToken = async (shareToken: string) => {
+  const [quiz] = await db
+    .select()
+    .from(quizzes)
+    .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
+    .limit(1)
+
+  if (!quiz) return null
+
+  const questionRows = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.quizId, quiz.id))
+    .orderBy(questions.position)
+
+  const questionIds = questionRows.map((q) => q.id)
+
+  const optionRows =
+    questionIds.length > 0
+      ? await db
+          .select({
+            id: questionOptions.id,
+            questionId: questionOptions.questionId,
+            text: questionOptions.text,
+            position: questionOptions.position,
+          })
+          .from(questionOptions)
+          .where(inArray(questionOptions.questionId, questionIds))
+          .orderBy(questionOptions.position)
+      : []
+  const optionsByQuestion = optionRows.reduce<Record<string, typeof optionRows>>((acc, option) => {
+    if (!acc[option.questionId]) acc[option.questionId] = []
+    acc[option.questionId].push(option)
+    return acc
+  }, {})
+
+  return {
+    ...quiz,
+    questions: questionRows.map((q) => ({ ...q, options: optionsByQuestion[q.id] ?? [] })),
+  }
+}
+export const setQuizSharing = async (id: string, userId: string, isPublic: boolean) => {
+  const [updatedQuiz] = await db
+    .update(quizzes)
+    .set({
+      isPublic,
+      shareToken: isPublic
+        ? sql.raw('COALESCE(share_token, gen_random_uuid()::text)')
+        : quizzes.shareToken,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
+    .returning({
+      id: quizzes.id,
+      isPublic: quizzes.isPublic,
+      shareToken: quizzes.shareToken,
+    })
+
+  return updatedQuiz ?? null
+}

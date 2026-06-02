@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 import { relations } from 'drizzle-orm'
 import {
   jsonb,
@@ -88,6 +90,10 @@ export const quizzes = pgTable('quizzes', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   type: questionTypeEnum('type'),
+  isPublic: boolean('is_public').notNull().default(false),
+  shareToken: text('share_token')
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),
