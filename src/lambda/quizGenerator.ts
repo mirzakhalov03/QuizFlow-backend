@@ -13,7 +13,7 @@ import {
   streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
 import { generateQuizFromText } from '../services/quizAi'
-import type { AiQuiz } from '../services/quizAi'
+import type { AiQuiz, AiQuizResult } from '../services/quizAi'
 import type { QuestionType } from '../types/questionTypes'
 
 // Lambda-local clients — no Express app dependencies, no credential env vars required
@@ -36,11 +36,14 @@ type LambdaEvent = {
 }
 
 const persistQuiz = async (
-  payload: AiQuiz,
+  result: AiQuizResult,
   event: LambdaEvent,
   source: { bucket: string; key: string },
 ) => {
   const db = await getLambdaDb()
+
+  const { quiz: payload, usage = null } = result
+
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
@@ -58,6 +61,7 @@ const persistQuiz = async (
         isTimerEnabled: Boolean(event.isTimerEnabled),
         timerDuration: event.isTimerEnabled ? (event.timerDuration ?? null) : null,
         userInstructions: event.userInstructions ?? null,
+        tokenUsage: usage,
         uploadedAt: new Date(),
       })
       .returning({ id: quizzes.id })
@@ -124,19 +128,19 @@ export const handler = async (event: LambdaEvent) => {
     const sourceTexts = await Promise.all(allKeys.map((k) => fetchSourceText(event.bucket, k)))
     const sourceText = sourceTexts.join('\n\n---\n\n')
 
-    const quiz =
-      event.quiz ??
-      (await generateQuizFromText({
-        sourceText,
-        questionCount: event.questionCount,
-        type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
-        userInstructions: event.userInstructions,
-        userBio: event.userBio,
-        defaultTitle: event.title,
-        model: event.model,
-      }))
+    const result = event.quiz
+      ? { quiz: event.quiz }
+      : await generateQuizFromText({
+          sourceText,
+          questionCount: event.questionCount,
+          type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
+          userInstructions: event.userInstructions,
+          userBio: event.userBio,
+          defaultTitle: event.title,
+          model: event.model,
+        })
 
-    const quizRow = await persistQuiz(quiz, event, {
+    const quizRow = await persistQuiz(result, event, {
       bucket: event.bucket,
       key: allKeys[0],
     })
@@ -147,10 +151,12 @@ export const handler = async (event: LambdaEvent) => {
       .set({ status: 'done', quizId: quizRow.id })
       .where(eq(quizJobs.id, event.jobId))
 
+    const quizData = result.quiz
+
     return {
       statusCode: 200,
       quizId: quizRow.id,
-      questionCount: quiz.questions.length,
+      questionCount: quizData.questions.length,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
