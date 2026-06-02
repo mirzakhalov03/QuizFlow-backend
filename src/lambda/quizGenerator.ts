@@ -36,14 +36,13 @@ type LambdaEvent = {
 }
 
 const persistQuiz = async (
-  result: AiQuizResult | AiQuiz,
+  result: AiQuizResult,
   event: LambdaEvent,
   source: { bucket: string; key: string },
 ) => {
   const db = await getLambdaDb()
 
-  const payload = 'quiz' in result ? result.quiz : result
-  const usage = 'usage' in result ? result.usage : null
+  const { quiz: payload, usage = null } = result
 
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
@@ -152,7 +151,7 @@ export const handler = async (event: LambdaEvent) => {
       .set({ status: 'done', quizId: quizRow.id })
       .where(eq(quizJobs.id, event.jobId))
 
-    const quizData = 'quiz' in result ? result.quiz : result
+    const quizData = result.quiz
 
     return {
       statusCode: 200,
