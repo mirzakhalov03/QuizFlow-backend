@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import {
@@ -18,6 +18,10 @@ type GetQuizzesParams = {
   offset?: number
   /** Case-insensitive substring search on quiz title */
   search?: string
+  /** Filter to quizzes matching any of these question types */
+  types?: QuestionType[]
+  /** Sort by creation date: newest first (default) or oldest first */
+  sort?: 'newest' | 'oldest'
 }
 
 type UpdateQuizInput = {
@@ -32,10 +36,19 @@ type UpdateQuizInput = {
  * Fetch a paginated list of quizzes for a user.
  * Uses a single query with a window function to avoid a separate count query.
  */
-export const getQuizzes = async ({ userId, limit = 20, offset = 0, search }: GetQuizzesParams) => {
-  const whereClause = search
-    ? and(eq(quizzes.userId, userId), ilike(quizzes.title, `%${search}%`))
-    : eq(quizzes.userId, userId)
+export const getQuizzes = async ({
+  userId,
+  limit = 20,
+  offset = 0,
+  search,
+  types,
+  sort = 'newest',
+}: GetQuizzesParams) => {
+  const conditions = [eq(quizzes.userId, userId)]
+  if (search) conditions.push(ilike(quizzes.title, `%${search}%`))
+  if (types && types.length > 0) conditions.push(inArray(quizzes.type, types))
+
+  const orderBy = sort === 'oldest' ? asc(quizzes.createdAt) : desc(quizzes.createdAt)
 
   const rows = await db
     .select({
@@ -55,8 +68,8 @@ export const getQuizzes = async ({ userId, limit = 20, offset = 0, search }: Get
       total: sql<number>`count(*) OVER()`.as('total'),
     })
     .from(quizzes)
-    .where(whereClause)
-    .orderBy(desc(quizzes.createdAt))
+    .where(and(...conditions))
+    .orderBy(orderBy)
     .limit(limit)
     .offset(offset)
 
