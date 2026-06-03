@@ -96,7 +96,7 @@ export const quizzes = pgTable('quizzes', {
   shareToken: text('share_token')
     .unique()
     .$defaultFn(() => crypto.randomUUID()),
-  difficulty: difficultyEnum('difficulty'),
+  difficulty: text('difficulty'),
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),

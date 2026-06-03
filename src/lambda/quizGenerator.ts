@@ -33,7 +33,7 @@ type LambdaEvent = {
   model?: string
   quiz?: AiQuiz
   userBio?: string | null
-  difficulty?: DifficultyType
+  quizDifficulty?: DifficultyType
 }
 
 const persistQuiz = async (
@@ -64,7 +64,7 @@ const persistQuiz = async (
         userInstructions: event.userInstructions ?? null,
         tokenUsage: usage,
         uploadedAt: new Date(),
-        difficulty: event.difficulty,
+        difficulty: event.quizDifficulty,
       })
       .returning({ id: quizzes.id })
 
@@ -140,7 +140,7 @@ export const handler = async (event: LambdaEvent) => {
           userBio: event.userBio,
           defaultTitle: event.title,
           model: event.model,
-          difficulty: event.difficulty,
+          difficulty: event.quizDifficulty,
         })
 
     const quizRow = await persistQuiz(result, event, {
