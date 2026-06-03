@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 
 import { chatJSON } from './openRouter'
 import { DEFAULT_MODEL } from '../constants/models'
+import type { DifficultyType } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
 
@@ -38,6 +39,7 @@ type GenerateOptions = {
   defaultTitle?: string
   model?: string
   userBio?: string | null
+  difficulty?: DifficultyType
 }
 
 const buildSchema = (type?: QuestionType) => ({
@@ -85,6 +87,7 @@ const buildSystemPrompt = (
   type: QuestionType | undefined,
   count: number,
   userBio?: string | null,
+  difficulty?: DifficultyType,
 ) => {
   const typeRule = type
     ? `Every question MUST be of type "${type}".`
@@ -130,6 +133,7 @@ const buildSystemPrompt = (
             userBio,
         ]
       : []),
+    ...(difficulty ? ['', '## Difficulty', defineDifficultyRule(difficulty)] : []),
   ].join('\n')
 }
 
@@ -141,6 +145,7 @@ export const generateQuizFromText = async ({
   defaultTitle,
   model,
   userBio,
+  difficulty,
 }: GenerateOptions): Promise<AiQuizResult> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -165,7 +170,7 @@ export const generateQuizFromText = async ({
     schema: buildSchema(type),
     temperature: 0.3,
     messages: [
-      { role: 'system', content: buildSystemPrompt(type, count, userBio) },
+      { role: 'system', content: buildSystemPrompt(type, count, userBio, difficulty) },
       { role: 'user', content: userParts.join('\n\n') },
     ],
   })
@@ -173,5 +178,18 @@ export const generateQuizFromText = async ({
   return {
     quiz: result.data,
     usage: result.usage,
+  }
+}
+
+const defineDifficultyRule = (difficulty: DifficultyType) => {
+  switch (difficulty) {
+    case 'easy':
+      return '- Difficulty: Easy. Focus on basic recall and definitions.'
+    case 'medium':
+      return '- Difficulty: Medium. Focus on comprehension and application of concepts.'
+    case 'hard':
+      return '- Difficulty: Hard. Focus on deep analysis and synthesis of information.'
+    default:
+      return '- Difficulty: Not defined'
   }
 }

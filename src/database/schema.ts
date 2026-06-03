@@ -14,9 +14,11 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
+import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -94,6 +96,7 @@ export const quizzes = pgTable('quizzes', {
   shareToken: text('share_token')
     .unique()
     .$defaultFn(() => crypto.randomUUID()),
+  difficulty: text('difficulty'),
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),
