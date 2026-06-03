@@ -5,6 +5,9 @@ import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
+import profileService from '../services/profileService'
+import { getPublicQuizByToken } from '../services/quiz.service'
+import { setQuizSharing } from '../services/quiz.service'
 import {
   deleteQuizById,
   getJobById,
@@ -36,6 +39,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
+      difficulty,
     } = req.body as GenerateQuizInput
 
     let resolvedBucket = bucket
@@ -60,6 +64,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       resolvedKeys = resolvedKey ? [resolvedKey] : []
     }
 
+    const userBio = await profileService.getProfileBio(userId)
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       keys: resolvedKeys,
@@ -71,6 +76,8 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
+      userBio,
+      difficulty,
     })
 
     res.status(202).json(
@@ -119,6 +126,23 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
         pagination: { limit, offset, count: total },
       }),
     )
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const getPublicQuizController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawToken = req.params.shareToken
+    const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
+
+    if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
+
+    const quiz = await getPublicQuizByToken(shareToken)
+
+    if (!quiz) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
+
+    res.status(200).json(successResponse('Public quiz retrieved successfully', quiz))
   } catch (error) {
     next(error)
   }
@@ -202,7 +226,48 @@ export const submitQuizController = async (req: Request, res: Response, next: Ne
     next(error)
   }
 }
+export const enableSharingController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+    const rawId = req.params.id
 
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const result = await setQuizSharing(id, userId, true)
+
+    if (!result) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Sharing enabled successfully', result))
+  } catch (error) {
+    next(error)
+  }
+}
+export const disableSharingController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+    const rawId = req.params.id
+
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const result = await setQuizSharing(id, userId, false)
+
+    if (!result) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Sharing disabled successfully', result))
+  } catch (error) {
+    next(error)
+  }
+}
 export const deleteQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)

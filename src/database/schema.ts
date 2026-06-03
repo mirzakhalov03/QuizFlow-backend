@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 import { relations } from 'drizzle-orm'
 import {
   jsonb,
@@ -12,9 +14,11 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
+import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -40,6 +44,8 @@ export const userProfiles = pgTable('user_profiles', {
   bio: text('bio'),
   profilePicture: text('profile_picture'),
   isOnboarded: boolean('is_onboarded').notNull().default(false),
+  aiFeedback: jsonb('ai_feedback'),
+  aiFeedbackGeneratedAt: timestamp('ai_feedback_generated_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
@@ -86,10 +92,16 @@ export const quizzes = pgTable('quizzes', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   type: questionTypeEnum('type'),
+  isPublic: boolean('is_public').notNull().default(false),
+  shareToken: text('share_token')
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
+  difficulty: text('difficulty'),
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),
   userInstructions: text('user_instructions'),
+  tokenUsage: jsonb('token_usage'),
   completedAt: timestamp('completed_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   uploadedAt: timestamp('uploaded_at', { mode: 'date' }),

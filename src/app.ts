@@ -8,6 +8,7 @@ import { swaggerSpec } from './config/swagger'
 import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
+import analyticsRoutes from './routes/analytics.routes'
 import authRoutes from './routes/auth.routes'
 import byokRoutes from './routes/byok.routes'
 import healthRoutes from './routes/health.routes'
@@ -38,6 +39,7 @@ app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
 app.use(byokRoutes)
+app.use(analyticsRoutes)
 
 app.use(handleMulterError)
 app.use(notFoundHandler)
