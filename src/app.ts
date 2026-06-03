@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
@@ -43,6 +44,7 @@ app.use(analyticsRoutes)
 
 app.use(handleMulterError)
 app.use(notFoundHandler)
+Sentry.setupExpressErrorHandler(app)
 app.use(errorHandler)
 
 export default app
