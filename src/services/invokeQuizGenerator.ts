@@ -5,8 +5,8 @@ import { lambdaClient } from './lambdaClient'
 import { db } from '../database/database'
 import { quizJobs } from '../database/schema'
 import { AppError } from '../helpers/AppError'
+import type { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
-
 type QuizGeneratePayload = {
   userId: string
   bucket: string
@@ -19,6 +19,7 @@ type QuizGeneratePayload = {
   questionCount?: number
   model?: string
   userBio?: string | null
+  difficulty?: DifficultyType
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env
