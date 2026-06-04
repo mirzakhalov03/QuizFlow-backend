@@ -106,10 +106,14 @@ export type PatchQuizInput = z.infer<typeof PatchQuizSchema>
  */
 const QuestionTypesFilter = z.preprocess((val) => {
   if (val === undefined || val === null) return undefined
-  const raw = Array.isArray(val) ? val : String(val).split(',')
-  const cleaned = [...new Set(raw.map((v) => String(v).trim()).filter(Boolean))]
-  return cleaned.length > 0 ? cleaned : undefined
-}, z.array(QuestionTypeEnum).optional())
+  const raw = Array.isArray(val) ? val.flatMap((v) => String(v).split(',')) : String(val).split(',')
+  const cleaned = new Set<string>()
+  for (const v of raw) {
+    const trimmed = v.trim()
+    if (trimmed) cleaned.add(trimmed)
+  }
+  return cleaned.size > 0 ? [...cleaned] : undefined
+}, z.array(QuestionTypeEnum).max(QUESTION_TYPES.length).optional())
 
 export const GetQuizzesSchema = z.object({
   limit: z.coerce
