@@ -43,6 +43,13 @@
       "when": 1780458235848,
       "tag": "0005_volatile_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779708799227,
+      "tag": "0010_abnormal_george_stacy",
+      "breakpoints": true
     }
   ]
 }
