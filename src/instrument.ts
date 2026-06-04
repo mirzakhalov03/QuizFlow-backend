@@ -6,5 +6,5 @@ const dsn = process.env.SENTRY_DSN
 
 Sentry.init({
   dsn: dsn,
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
 })

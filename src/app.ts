@@ -42,9 +42,9 @@ app.use(quizRoutes)
 app.use(byokRoutes)
 app.use(analyticsRoutes)
 
-app.use(handleMulterError)
 app.use(notFoundHandler)
 Sentry.setupExpressErrorHandler(app)
+app.use(handleMulterError)
 app.use(errorHandler)
 
 export default app

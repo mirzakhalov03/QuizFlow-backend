@@ -1,21 +1,11 @@
-import * as Sentry from '@sentry/node'
 import { type NextFunction, type Request, type Response } from 'express'
 
-import { type AuthRequest } from './authMiddleware'
 import { errorResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 
-export const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+export const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const isOperationalError = err instanceof AppError
   const isProduction = process.env.NODE_ENV === 'production'
-
-  const authReq = req as AuthRequest
-  if (authReq.user) {
-    Sentry.setUser({
-      id: authReq.user.id,
-      email: authReq.user.email,
-    })
-  }
 
   if (!isProduction && err instanceof Error) {
     console.error(err)
