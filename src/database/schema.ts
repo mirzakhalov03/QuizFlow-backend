@@ -22,13 +22,20 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   refreshToken: text('refresh_token').unique(),
   password: text('password'),
-  passwordResetTokenHash: text('password_reset_token_hash'),
-  passwordResetTokenExpiresAt: timestamp('password_reset_token_expires_at', { mode: 'date' }),
+  isVerified: boolean('is_verified').notNull().default(false),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+})
+
+export const otps = pgTable('otps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').notNull().unique(),
+  code: text('code').notNull(),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
 })
 
 export const userProfiles = pgTable('user_profiles', {

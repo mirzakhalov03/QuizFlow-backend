@@ -16,10 +16,22 @@ export const PasswordResetRequestSchema = z.object({
 })
 
 export const PasswordResetConfirmSchema = z.object({
+  email: z.string().email(),
   token: z.string().min(1),
   password: z.string().min(8),
 })
 
 export const SetPasswordSchema = z.object({
   password: z.string().min(8),
+})
+
+export const RegisterConfirmSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().length(6),
+})
+
+export const DeleteAccountRequestSchema = z.object({})
+
+export const DeleteAccountConfirmSchema = z.object({
+  otp: z.string().length(6),
 })
