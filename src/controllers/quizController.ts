@@ -42,6 +42,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
+      difficulty,
     } = req.body as GenerateQuizInput
 
     if (source === 'notion') {
@@ -106,6 +107,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       questionCount,
       model,
       userBio,
+      difficulty,
     })
 
     return res.status(202).json(
@@ -144,14 +146,15 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const { limit, offset, search } = req.query as unknown as GetQuizzesQuery
+    const { limit, offset, search, types, sort } = req.query as unknown as GetQuizzesQuery
 
-    const { items, total } = await getQuizzes({ userId, limit, offset, search })
+    const { items, total } = await getQuizzes({ userId, limit, offset, search, types, sort })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {
         items,
         pagination: { limit, offset, count: total },
+        filters: { search: search ?? null, types: types ?? null, sort },
       }),
     )
   } catch (error) {
