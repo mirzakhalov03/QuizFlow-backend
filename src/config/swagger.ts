@@ -22,8 +22,16 @@ const options: swaggerJSDoc.Options = {
       { name: 'Health', description: 'Health and readiness checks' },
       { name: 'Upload', description: 'File upload APIs' },
       { name: 'Quiz', description: 'Quiz generation and CRUD APIs' },
+      { name: 'Analytics', description: 'User quiz analytics' },
     ],
     components: {
+      securitySchemes: {
+        cookieAuth: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'accessToken',
+        },
+      },
       schemas: {
         ApiSuccessResponse: {
           type: 'object',
@@ -81,7 +89,12 @@ const options: swaggerJSDoc.Options = {
       },
     },
   },
-  apis: [path.join(__dirname, '../app.ts'), path.join(__dirname, '../routes/*.ts')],
+  apis: [
+    path.join(__dirname, '../app.ts').replace(/\\/g, '/'),
+    path.join(__dirname, '../app.js').replace(/\\/g, '/'),
+    path.join(__dirname, '../routes/*.ts').replace(/\\/g, '/'),
+    path.join(__dirname, '../routes/*.js').replace(/\\/g, '/'),
+  ],
 }
 
 export const swaggerSpec = swaggerJSDoc(options)

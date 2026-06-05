@@ -1,0 +1,1 @@
+ALTER TABLE "quizzes" ADD COLUMN "token_usage" jsonb;

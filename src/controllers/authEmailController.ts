@@ -44,7 +44,7 @@ const confirmRegistration = async (req: Request, res: Response, next: NextFuncti
 const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body
-    const { user, accessToken, refreshToken } = await authEmailService.login(email, password)
+    const { accessToken, refreshToken } = await authEmailService.login(email, password)
 
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)

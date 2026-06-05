@@ -6,6 +6,9 @@ import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
 import notionQuizService from '../services/notionQuizService'
+import profileService from '../services/profileService'
+import { getPublicQuizByToken } from '../services/quiz.service'
+import { setQuizSharing } from '../services/quiz.service'
 import {
   deleteQuizById,
   getJobById,
@@ -24,7 +27,7 @@ import type {
 export const generateQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
-    const source = typeof req.query.source === 'string' ? req.query.source : 'file'
+    const source = (req.query as { source: string }).source
 
     const {
       pageIds,
@@ -51,10 +54,10 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         pageIds,
         title,
         userInstructions,
-        isTimerEnabled: Boolean(isTimerEnabled),
         timerDuration,
         type,
         questionCount,
+        isTimerEnabled: Boolean(isTimerEnabled),
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))
@@ -90,6 +93,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       )
     }
 
+    const userBio = await profileService.getProfileBio(userId)
     const jobId = await invokeQuizGenerator({
       bucket: resolvedBucket,
       keys: resolvedKeys,
@@ -101,6 +105,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       type,
       questionCount,
       model,
+      userBio,
     })
 
     return res.status(202).json(
@@ -149,6 +154,23 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
         pagination: { limit, offset, count: total },
       }),
     )
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const getPublicQuizController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawToken = req.params.shareToken
+    const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
+
+    if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
+
+    const quiz = await getPublicQuizByToken(shareToken)
+
+    if (!quiz) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
+
+    res.status(200).json(successResponse('Public quiz retrieved successfully', quiz))
   } catch (error) {
     next(error)
   }
@@ -232,7 +254,48 @@ export const submitQuizController = async (req: Request, res: Response, next: Ne
     next(error)
   }
 }
+export const enableSharingController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+    const rawId = req.params.id
 
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const result = await setQuizSharing(id, userId, true)
+
+    if (!result) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Sharing enabled successfully', result))
+  } catch (error) {
+    next(error)
+  }
+}
+export const disableSharingController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+    const rawId = req.params.id
+
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const result = await setQuizSharing(id, userId, false)
+
+    if (!result) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Sharing disabled successfully', result))
+  } catch (error) {
+    next(error)
+  }
+}
 export const deleteQuizByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)
