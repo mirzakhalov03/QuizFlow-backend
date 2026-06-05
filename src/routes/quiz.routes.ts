@@ -105,6 +105,25 @@ router.get('/quizzes/jobs/:jobId', authMiddleware, getJobStatusController)
  *         schema:
  *           type: integer
  *           minimum: 0
+ *       - in: query
+ *         name: types
+ *         description: >
+ *           Filter by question type. Repeat the param or pass a comma-separated
+ *           list (e.g. types=open_ended,true_false).
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *             enum: [multiple_choice, multi_select, open_ended, true_false]
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: sort
+ *         description: Sort by creation date.
+ *         schema:
+ *           type: string
+ *           enum: [newest, oldest]
+ *           default: newest
  *     responses:
  *       200:
  *         description: Quizzes retrieved

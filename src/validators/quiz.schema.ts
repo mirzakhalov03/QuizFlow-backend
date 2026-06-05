@@ -102,6 +102,22 @@ export const PatchQuizSchema = z
 
 export type PatchQuizInput = z.infer<typeof PatchQuizSchema>
 
+/**
+ * Filter by one or more question types. Accepts a repeated `types` param
+ * (`?types=open_ended&types=true_false`) or a comma-separated list
+ * (`?types=open_ended,true_false`). Normalised to a deduped array.
+ */
+const QuestionTypesFilter = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined
+  const raw = Array.isArray(val) ? val.flatMap((v) => String(v).split(',')) : String(val).split(',')
+  const cleaned = new Set<string>()
+  for (const v of raw) {
+    const trimmed = v.trim()
+    if (trimmed) cleaned.add(trimmed)
+  }
+  return cleaned.size > 0 ? [...cleaned] : undefined
+}, z.array(QuestionTypeEnum).max(QUESTION_TYPES.length).optional())
+
 export const GetQuizzesSchema = z.object({
   limit: z.coerce
     .number()
@@ -111,6 +127,10 @@ export const GetQuizzesSchema = z.object({
     .default(20),
   offset: z.coerce.number().int().min(0, 'offset must be a non-negative integer').default(0),
   search: z.string().trim().min(1).optional(),
+  /** Filter quizzes by question type. */
+  types: QuestionTypesFilter,
+  /** Sort by creation date: newest first (default) or oldest first. */
+  sort: z.enum(['newest', 'oldest']).default('newest'),
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
