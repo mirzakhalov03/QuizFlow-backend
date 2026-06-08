@@ -16,6 +16,7 @@ import { authMiddleware } from '../middlewares/authMiddleware'
 import { validate, validateQuery } from '../middlewares/validate'
 import {
   GenerateQuizSchema,
+  GenerateQuizSourceSchema,
   GetQuizzesSchema,
   PatchQuizSchema,
   SubmitQuizSchema,
@@ -50,7 +51,13 @@ const router = Router()
  *       401:
  *         description: Not authenticated
  */
-router.post('/quizzes', authMiddleware, validate(GenerateQuizSchema), generateQuizController)
+router.post(
+  '/quizzes',
+  authMiddleware,
+  validateQuery(GenerateQuizSourceSchema),
+  validate(GenerateQuizSchema),
+  generateQuizController,
+)
 
 /**
  * @openapi

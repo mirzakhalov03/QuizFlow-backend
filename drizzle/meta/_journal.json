@@ -33,22 +33,8 @@
     {
       "idx": 4,
       "version": "7",
-      "when": 1780421771143,
-      "tag": "0004_fat_the_professor",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1780458235848,
-      "tag": "0005_volatile_red_wolf",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1779708799227,
-      "tag": "0010_abnormal_george_stacy",
+      "when": 1780657429554,
+      "tag": "0004_fuzzy_marten_broadcloak",
       "breakpoints": true
     }
   ]

@@ -5,9 +5,19 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
-const DifficultyEnum = z.enum(DIFFICULTY_TYPES)
+
+export const GenerateQuizSourceSchema = z.object({
+  source: z.enum(['file', 'notion']).default('file'),
+})
+
 export const GenerateQuizSchema = z
   .object({
+    /** Notion page IDs — required when source=notion, supports multiple pages */
+    pageIds: z
+      .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
+      .transform((val) => (Array.isArray(val) ? val : [val]))
+      .optional(),
+
     /** Full S3 URL (s3://bucket/key) or standard AWS HTTPS URL. Takes precedence over `bucket`+`key`. */
     s3Url: z
       .string()
@@ -50,12 +60,14 @@ export const GenerateQuizSchema = z
     difficulty: DifficultyEnum.optional(),
   })
   .superRefine((data, ctx) => {
-    // Must have either s3Url, key, or keys
-    if (!data.s3Url && !data.key && (!data.keys || data.keys.length === 0)) {
+    const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
+    const hasNotionSource = data.pageIds && data.pageIds.length > 0
+
+    if (!hasFileSource && !hasNotionSource) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['key'],
-        message: 'Either s3Url, key, or keys is required',
+        path: ['pageIds'],
+        message: 'Either pageIds (for notion) or s3Url/key/keys (for file) is required',
       })
     }
 
@@ -135,37 +147,6 @@ export const GetQuizzesSchema = z.object({
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
 
-export const GenerateQuizFromNotionSchema = z
-  .object({
-    pageId: z.string().min(1, 'pageId is required'),
-
-    title: z.string().min(1).max(200).optional(),
-
-    userInstructions: z.string().max(1000).optional(),
-
-    isTimerEnabled: z.boolean().optional(),
-
-    timerDuration: z.coerce
-      .number()
-      .int()
-      .positive('timerDuration must be a positive integer')
-      .optional(),
-
-    type: QuestionTypeEnum.optional(),
-
-    questionCount: z.coerce.number().int().min(1).max(30).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.isTimerEnabled && !data.timerDuration) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['timerDuration'],
-        message: 'timerDuration is required when isTimerEnabled is true',
-      })
-    }
-  })
-
-export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
 export const SubmitQuizSchema = z.object({
   answers: z
     .array(

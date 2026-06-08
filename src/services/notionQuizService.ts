@@ -10,7 +10,7 @@ import type { QuestionType } from '../types/questionTypes'
 
 type GenerateQuizFromNotionInput = {
   userId: string
-  pageId: string
+  pageIds: string[]
   title?: string
   userInstructions?: string
   isTimerEnabled?: boolean
@@ -24,12 +24,17 @@ const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
 class NotionQuizService {
   async generateQuizFromNotionPage(input: GenerateQuizFromNotionInput) {
     try {
-      // 1. Fetch content from Notion page
-      const notionContent = await notionService.getPageContent(input.userId, input.pageId)
+      // 1. Fetch content from all pages in parallel
+      const uniquePageIds = [...new Set(input.pageIds)]
+      const pageContents = await Promise.all(
+        uniquePageIds.map((pageId) => notionService.getPageContent(input.userId, pageId)),
+      )
+
+      const notionContent = pageContents.filter((c) => c.trim().length > 0).join('\n\n---\n\n')
 
       if (!notionContent || notionContent.trim().length === 0) {
         throw new AppError(
-          'No content found in the selected Notion page or its databases',
+          'No content found in the selected Notion pages or their databases',
           400,
           'EMPTY_NOTION_PAGE',
         )
@@ -39,13 +44,13 @@ class NotionQuizService {
       const contentBytes = Buffer.byteLength(notionContent, 'utf8')
       if (contentBytes > MAX_NOTION_CONTENT_BYTES) {
         throw new AppError(
-          `Notion page content exceeds ${MAX_NOTION_CONTENT_BYTES / 1024 / 1024}MB limit (${(contentBytes / 1024 / 1024).toFixed(2)}MB)`,
+          `Notion content exceeds ${MAX_NOTION_CONTENT_BYTES / 1024 / 1024}MB limit (${(contentBytes / 1024 / 1024).toFixed(2)}MB)`,
           413,
           'CONTENT_TOO_LARGE',
         )
       }
 
-      // 3. Upload to S3 as temp file
+      // 3. Upload combined content to S3 as a single temp file
       const key = `notion-temp/${input.userId}/${randomUUID()}.txt`
       await s3Client.send(
         new PutObjectCommand({
@@ -56,7 +61,7 @@ class NotionQuizService {
         }),
       )
 
-      // 4. Invoke quiz generator Lambda with S3 location
+      // 4. Invoke quiz generator Lambda
       const jobId = await invokeQuizGenerator({
         bucket: s3BucketName,
         keys: [key],
