@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 
@@ -40,6 +41,11 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       fullName: user.fullName,
       hasPassword: user.password !== null,
     }
+
+    Sentry.setUser({
+      id: user.id,
+      email: user.email,
+    })
 
     next()
   } catch {
