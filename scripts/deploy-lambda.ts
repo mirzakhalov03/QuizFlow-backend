@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import {
+  GetFunctionConfigurationCommand,
   LambdaClient,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
@@ -42,7 +43,7 @@ async function deploy() {
     }
 
     // Lambda expects the entry file to be at the root of the zip
-    zip.addLocalFile(buildPath)
+    zip.addLocalFile(buildPath, '')
     const zipBuffer = zip.toBuffer()
     console.log(`Zip created. Size: ${(zipBuffer.length / 1024).toFixed(2)} KB`)
 
@@ -81,21 +82,27 @@ async function deploy() {
       'AWS_BUCKET_NAME',
     ]
 
-    const Variables: Record<string, string> = {}
+    const currentConfig = await client.send(
+      new GetFunctionConfigurationCommand({ FunctionName: functionName }),
+    )
+    const currentVariables = currentConfig.Environment?.Variables || {}
+
+    const Variables: Record<string, string> = { ...currentVariables }
+    let hasChanges = false
     for (const key of variablesToSync) {
-      if (process.env[key]) {
+      if (process.env[key] !== undefined && process.env[key] !== currentVariables[key]) {
         Variables[key] = process.env[key] as string
+        hasChanges = true
       }
     }
 
-    if (Object.keys(Variables).length > 0) {
+    if (hasChanges) {
       const updateConfigCommand = new UpdateFunctionConfigurationCommand({
         FunctionName: functionName,
         Environment: {
           Variables,
         },
       })
-
       await client.send(updateConfigCommand)
       console.log('Lambda environment variables synced successfully.')
       console.log('Waiting for Lambda update to finish...')

@@ -27,13 +27,15 @@ async function testCompletion() {
         messages: [{ role: 'user', content: 'Say hello' }],
         max_tokens: 10,
       })
-      console.log(`SUCCESS: ${model} responded with: ${completion.choices[0].message.content}`)
+      console.log(
+        `SUCCESS: ${model} responded with: ${completion.choices[0]?.message?.content ?? ''}`,
+      )
     } catch (err: unknown) {
-      const error = err as { status?: number; message?: string; response?: unknown }
+      const error = err as Record<string, unknown> | null | undefined
       console.error(`FAILED: ${model}`)
-      console.error(`Status: ${error.status}`)
-      console.error(`Message: ${error.message}`)
-      if (error.response) {
+      console.error(`Status: ${error?.status}`)
+      console.error(`Message: ${error?.message}`)
+      if (error?.response) {
         console.error('Response body:', JSON.stringify(error.response, null, 2))
       }
       console.log('---')

@@ -12,11 +12,11 @@ async function testGeneration() {
     console.log('SUCCESS!')
     console.log(JSON.stringify(result, null, 2))
   } catch (err: unknown) {
-    const error = err as { message?: string; code?: string; details?: unknown }
+    const error = err as Record<string, unknown> | null | undefined
     console.error('FAILED generation')
-    console.error(`Message: ${error.message}`)
-    console.error(`Code: ${error.code}`)
-    console.error(`Details: ${JSON.stringify(error.details, null, 2)}`)
+    console.error(`Message: ${error?.message}`)
+    console.error(`Code: ${error?.code}`)
+    console.error(`Details: ${JSON.stringify(error?.details, null, 2)}`)
   }
 }
 
