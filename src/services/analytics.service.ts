@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { quizResults, quizzes } from '../database/schema'
+import { quizJobs, quizResults, quizzes } from '../database/schema'
 import type { QuestionType } from '../types/questionTypes'
 
 export type ScorePoint = {
@@ -20,6 +20,7 @@ export type AnalyticsSummary = {
   averageScore: number
   scoreOverTime: ScorePoint[]
   breakdownByType: TypeBreakdown[]
+  totalTokensUsed: number
 }
 
 const toPercent = (correct: number, total: number) => (total > 0 ? (correct / total) * 100 : 0)
@@ -27,7 +28,7 @@ const toPercent = (correct: number, total: number) => (total > 0 ? (correct / to
 const round = (n: number) => Math.round(n * 100) / 100
 
 export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
-  const rows = await db
+  const quizRows = await db
     .select({
       createdAt: quizResults.createdAt,
       totalQuestions: quizResults.totalQuestions,
@@ -38,12 +39,28 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
     .where(eq(quizResults.userId, userId))
 
-  if (rows.length === 0) {
+  const tokenUsageRows = await db
+    .select({
+      tokensUsed: quizJobs.tokensUsed,
+    })
+    .from(quizJobs)
+    .where(eq(quizJobs.userId, userId))
+
+  let totalTokensUsed = 0
+  for (const row of tokenUsageRows) {
+    if (row.tokensUsed && typeof row.tokensUsed === 'object') {
+      const usage = row.tokensUsed as { total_tokens?: number }
+      totalTokensUsed += usage.total_tokens ?? 0
+    }
+  }
+
+  if (quizRows.length === 0) {
     return {
       totalQuizzesTaken: 0,
       averageScore: 0,
       scoreOverTime: [],
       breakdownByType: [],
+      totalTokensUsed,
     }
   }
 
@@ -52,7 +69,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   const byDay = new Map<string, { sum: number; count: number }>()
   const byType = new Map<QuestionType, { sum: number; count: number }>()
 
-  for (const r of rows) {
+  for (const r of quizRows) {
     if (r.totalQuestions <= 0) continue
 
     const percent = toPercent(r.correctAnswers, r.totalQuestions)
@@ -92,5 +109,6 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     averageScore: round(averageScore),
     scoreOverTime,
     breakdownByType,
+    totalTokensUsed,
   }
 }

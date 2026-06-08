@@ -208,6 +208,7 @@ export const quizJobs = pgTable(
     quizId: uuid('quiz_id').references(() => quizzes.id, { onDelete: 'set null' }),
     status: jobStatusEnum('status').notNull().default('pending'),
     requestId: text('request_id'),
+    tokensUsed: jsonb('tokens_used'),
     error: text('error'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
