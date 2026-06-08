@@ -8,7 +8,7 @@ import { s3Client, s3BucketName } from './s3Client'
 import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
 
-type GenerateQuizFromNotionInput = {
+export type GenerateQuizFromNotionInput = {
   userId: string
   pageIds: string[]
   title?: string
@@ -17,6 +17,7 @@ type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  folderId?: string
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -72,6 +73,7 @@ class NotionQuizService {
         timerDuration: input.timerDuration,
         type: input.type,
         questionCount: input.questionCount,
+        folderId: input.folderId,
       })
 
       return {

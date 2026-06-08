@@ -4,7 +4,7 @@ import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
-import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
+import { invokeQuizGenerator, type QuizGeneratePayload } from '../services/invokeQuizGenerator'
 import notionQuizService from '../services/notionQuizService'
 import profileService from '../services/profileService'
 import { getPublicQuizByToken } from '../services/quiz.service'
@@ -43,6 +43,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       questionCount,
       model,
       difficulty,
+      folderId,
     } = req.body as GenerateQuizInput
 
     if (source === 'notion') {
@@ -59,6 +60,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         type,
         questionCount,
         isTimerEnabled: Boolean(isTimerEnabled),
+        folderId,
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))
@@ -95,20 +97,22 @@ export const generateQuizController = async (req: Request, res: Response, next: 
     }
 
     const userBio = await profileService.getProfileBio(userId)
-    const jobId = await invokeQuizGenerator({
-      bucket: resolvedBucket,
-      keys: resolvedKeys,
+    const payload: QuizGeneratePayload = {
+      bucket: resolvedBucket!,
+      keys: resolvedKeys!,
       userId,
       title,
       userInstructions,
       isTimerEnabled: Boolean(isTimerEnabled),
-      timerDuration,
+      timerDuration: timerDuration ?? undefined,
       type,
       questionCount,
       model,
       userBio,
       difficulty,
-    })
+      folderId,
+    }
+    const jobId = await invokeQuizGenerator(payload)
 
     return res.status(202).json(
       successResponse('Quiz generation started', {
@@ -146,9 +150,18 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const { limit, offset, search, types, sort } = req.query as unknown as GetQuizzesQuery
+    const { limit, offset, search, types, sort, excludeFolderId } =
+      req.query as unknown as GetQuizzesQuery
 
-    const { items, total } = await getQuizzes({ userId, limit, offset, search, types, sort })
+    const { items, total } = await getQuizzes({
+      userId,
+      limit,
+      offset,
+      search,
+      types,
+      sort,
+      excludeFolderId,
+    })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {

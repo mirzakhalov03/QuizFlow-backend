@@ -36,6 +36,34 @@
       "when": 1780657429554,
       "tag": "0004_fuzzy_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780700000000,
+      "tag": "0005_volatile_red_wolf",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0010_abnormal_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780900000000,
+      "tag": "0011_bored_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780929304220,
+      "tag": "0012_complete_the_spike",
+      "breakpoints": true
     }
   ]
 }

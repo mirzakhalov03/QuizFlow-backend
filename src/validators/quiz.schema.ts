@@ -5,6 +5,7 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
+const DifficultyEnum = z.enum(DIFFICULTY_TYPES)
 
 export const GenerateQuizSourceSchema = z.object({
   source: z.enum(['file', 'notion']).default('file'),
@@ -58,6 +59,8 @@ export const GenerateQuizSchema = z
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
     difficulty: DifficultyEnum.optional(),
+
+    folderId: z.string().uuid().optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
@@ -135,7 +138,7 @@ export const GetQuizzesSchema = z.object({
     .number()
     .int()
     .min(1, 'limit must be at least 1')
-    .max(100, 'limit must be at most 100')
+    .max(1000, 'limit must be at most 1000')
     .default(20),
   offset: z.coerce.number().int().min(0, 'offset must be a non-negative integer').default(0),
   search: z.string().trim().min(1).optional(),
@@ -143,9 +146,45 @@ export const GetQuizzesSchema = z.object({
   types: QuestionTypesFilter,
   /** Sort by creation date: newest first (default) or oldest first. */
   sort: z.enum(['newest', 'oldest']).default('newest'),
+  /** Exclude quizzes that are in a specific folder */
+  excludeFolderId: z.string().uuid().optional(),
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
+
+export const GenerateQuizFromNotionSchema = z
+  .object({
+    pageId: z.string().min(1, 'pageId is required'),
+
+    title: z.string().min(1).max(200).optional(),
+
+    userInstructions: z.string().max(1000).optional(),
+
+    isTimerEnabled: z.boolean().optional(),
+
+    timerDuration: z.coerce
+      .number()
+      .int()
+      .positive('timerDuration must be a positive integer')
+      .optional(),
+
+    type: QuestionTypeEnum.optional(),
+
+    questionCount: z.coerce.number().int().min(1).max(30).optional(),
+
+    folderId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isTimerEnabled && !data.timerDuration) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['timerDuration'],
+        message: 'timerDuration is required when isTimerEnabled is true',
+      })
+    }
+  })
+
+export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
 
 export const SubmitQuizSchema = z.object({
   answers: z
