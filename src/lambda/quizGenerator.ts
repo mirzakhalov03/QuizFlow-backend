@@ -151,7 +151,7 @@ export const handler = async (event: LambdaEvent) => {
     // Update job → done
     await db
       .update(quizJobs)
-      .set({ status: 'done', quizId: quizRow.id })
+      .set({ status: 'done', quizId: quizRow.id, tokensUsed: result.usage })
       .where(eq(quizJobs.id, event.jobId))
 
     const quizData = result.quiz
