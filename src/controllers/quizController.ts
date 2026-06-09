@@ -7,6 +7,7 @@ import { parseS3Url } from '../helpers/utils/quizUtils'
 import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
 import notionQuizService from '../services/notionQuizService'
 import profileService from '../services/profileService'
+import { generateQuizPdf } from '../services/quizPdf.service'
 import { getPublicQuizByToken } from '../services/quiz.service'
 import { setQuizSharing } from '../services/quiz.service'
 import {
@@ -195,6 +196,32 @@ export const getQuizByIdController = async (req: Request, res: Response, next: N
     }
 
     res.status(200).json(successResponse('Quiz retrieved successfully', quiz))
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const exportQuizPdfController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+
+    const rawId = req.params.id
+    const id = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!id) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const quiz = await getQuizById(id, userId)
+    if (!quiz) {
+      throw new AppError('Quiz not found', 404, 'NOT_FOUND')
+    }
+
+    const pdf = await generateQuizPdf(quiz)
+
+    const safeName = quiz.title.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'quiz'
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}.pdf"`)
+    res.status(200).send(pdf)
   } catch (error) {
     next(error)
   }
