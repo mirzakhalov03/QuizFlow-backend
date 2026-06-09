@@ -57,7 +57,7 @@ export const generateQuizFromNotion = async (
 
     const payload: GenerateQuizFromNotionInput = {
       userId,
-      pageId,
+      pageIds: [pageId],
       title,
       userInstructions,
       isTimerEnabled: Boolean(isTimerEnabled),
