@@ -40,6 +40,7 @@ type GenerateOptions = {
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
+  apiKey?: string
 }
 
 const buildSchema = (type?: QuestionType) => ({
@@ -146,6 +147,7 @@ export const generateQuizFromText = async ({
   model,
   userBio,
   difficulty,
+  apiKey,
 }: GenerateOptions): Promise<AiQuizResult> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -166,6 +168,7 @@ export const generateQuizFromText = async ({
   }
 
   const result = await chatJSON<AiQuiz>({
+    apiKey,
     model: model ?? DEFAULT_MODEL,
     schema: buildSchema(type),
     temperature: 0.3,

@@ -20,6 +20,7 @@ type QuizGeneratePayload = {
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
+  apiKeyId?: string
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env

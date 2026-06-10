@@ -43,8 +43,8 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       questionCount,
       model,
       difficulty,
+      apiKeyId,
     } = req.body as GenerateQuizInput
-
     if (source === 'notion') {
       if (!pageIds || pageIds.length === 0) {
         throw new AppError('pageIds is required for source=notion', 400, 'VALIDATION_ERROR')
@@ -108,6 +108,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       model,
       userBio,
       difficulty,
+      apiKeyId,
     })
 
     return res.status(202).json(

@@ -80,6 +80,7 @@ async function deploy() {
       'DATABASE_SSL',
       'APP_URL',
       'AWS_BUCKET_NAME',
+      'API_KEY_ENCRYPTION_SECRET',
     ]
 
     const currentConfig = await client.send(
