@@ -1,6 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm'
+import { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { db } from '../database/database'
+import * as schema from '../database/schema'
 import { userApiKeys } from '../database/schema'
 import { decryptApiKeyValue, encryptApiKeyValue, maskApiKeyValue } from '../helpers/apiKeyCrypto'
 
@@ -18,17 +20,23 @@ type UpdateInput = {
 const toSafeView = (row: typeof userApiKeys.$inferSelect) => ({
   id: row.id,
   keyName: row.keyName,
+  provider: row.provider,
   maskedKey: maskApiKeyValue(decryptApiKeyValue(row.keyValue)),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 })
 
-export const createByok = async ({ userId, keyName, keyValue }: CreateInput) => {
+export const createByok = async ({
+  userId,
+  keyName,
+  keyValue,
+  provider,
+}: CreateInput & { provider: string }) => {
   const encryptedValue = encryptApiKeyValue(keyValue)
 
   const [row] = await db
     .insert(userApiKeys)
-    .values({ userId, keyName, keyValue: encryptedValue })
+    .values({ userId, keyName, provider, keyValue: encryptedValue })
     .returning()
 
   return toSafeView(row)
@@ -44,10 +52,15 @@ export const listByok = async (userId: string) => {
   return rows.map(toSafeView)
 }
 
-export const updateByok = async (id: string, userId: string, data: UpdateInput) => {
-  const updatePayload: { keyName?: string; keyValue?: string } = {}
-  if (data.keyName !== undefined) updatePayload.keyName = data.keyName
-  if (data.keyValue !== undefined) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+export const updateByok = async (
+  id: string,
+  userId: string,
+  data: UpdateInput & { provider?: string },
+) => {
+  const updatePayload: { keyName?: string; keyValue?: string; provider?: string } = {}
+  if (data.keyName) updatePayload.keyName = data.keyName
+  if (data.keyValue) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+  if (data.provider) updatePayload.provider = data.provider
 
   const [row] = await db
     .update(userApiKeys)
@@ -65,4 +78,17 @@ export const deleteByok = async (id: string, userId: string) => {
     .returning({ id: userApiKeys.id })
 
   return deleted.length > 0
+}
+
+export const getByokById = async (
+  id: string,
+  userId: string,
+  dbClient: NodePgDatabase<typeof schema>,
+) => {
+  const row = await dbClient
+    .select({ encryptedKeyValue: userApiKeys.keyValue })
+    .from(userApiKeys)
+    .where(and(eq(userApiKeys.id, id), eq(userApiKeys.userId, userId)))
+  const encryptedKeyValue = row[0]?.encryptedKeyValue
+  return encryptedKeyValue ? decryptApiKeyValue(encryptedKeyValue) : undefined
 }

@@ -1,3 +1,4 @@
+import './instrument'
 import dotenv from 'dotenv'
 dotenv.config()
 

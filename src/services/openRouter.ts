@@ -38,10 +38,15 @@ const getClient = (apiKey?: string) => {
   })
 }
 
-export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
+export type ChatJsonResult<T> = {
+  data: T
+  usage?: OpenAI.CompletionUsage
+}
+
+export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonResult<T>> => {
   const client = getClient(options.apiKey)
 
-  let completion: OpenAI.Chat.ChatCompletion
+  let completion: OpenAI.ChatCompletion
 
   try {
     completion = await client.chat.completions.create({
@@ -59,6 +64,7 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
     })
   } catch (err) {
     if (err instanceof OpenAI.APIError) {
+      console.error('[openRouter] error:', err.status, err.message, err.error)
       throw new AppError(
         `OpenRouter request failed (${err.status})`,
         502,
@@ -81,7 +87,10 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<T> => {
   }
 
   try {
-    return JSON.parse(content) as T
+    return {
+      data: JSON.parse(content) as T,
+      usage: completion.usage,
+    }
   } catch (error) {
     throw new AppError('OpenRouter returned non-JSON content', 502, 'OPENROUTER_PARSE_ERROR', {
       content,

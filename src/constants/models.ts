@@ -1,5 +1,5 @@
 export const SUPPORTED_MODELS = [
-  'google/gemini-2.0-flash-001',
+  'google/gemini-3.5-flash',
   'openai/gpt-4o-mini',
   'deepseek/deepseek-chat-v3',
   'meta-llama/llama-3.3-70b-instruct',
@@ -7,4 +7,4 @@ export const SUPPORTED_MODELS = [
 
 export type SupportedModel = (typeof SUPPORTED_MODELS)[number]
 
-export const DEFAULT_MODEL: SupportedModel = 'google/gemini-2.0-flash-001'
+export const DEFAULT_MODEL: SupportedModel = 'google/gemini-3.5-flash'

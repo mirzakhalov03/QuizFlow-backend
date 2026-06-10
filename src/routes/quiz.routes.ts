@@ -2,8 +2,11 @@ import { Router } from 'express'
 
 import {
   deleteQuizByIdController,
+  disableSharingController,
+  enableSharingController,
   generateQuizController,
   getJobStatusController,
+  getPublicQuizController,
   getQuizByIdController,
   getQuizzesController,
   patchQuizByIdController,
@@ -13,6 +16,7 @@ import { authMiddleware } from '../middlewares/authMiddleware'
 import { validate, validateQuery } from '../middlewares/validate'
 import {
   GenerateQuizSchema,
+  GenerateQuizSourceSchema,
   GetQuizzesSchema,
   PatchQuizSchema,
   SubmitQuizSchema,
@@ -47,7 +51,13 @@ const router = Router()
  *       401:
  *         description: Not authenticated
  */
-router.post('/quizzes', authMiddleware, validate(GenerateQuizSchema), generateQuizController)
+router.post(
+  '/quizzes',
+  authMiddleware,
+  validateQuery(GenerateQuizSourceSchema),
+  validate(GenerateQuizSchema),
+  generateQuizController,
+)
 
 /**
  * @openapi
@@ -102,6 +112,25 @@ router.get('/quizzes/jobs/:jobId', authMiddleware, getJobStatusController)
  *         schema:
  *           type: integer
  *           minimum: 0
+ *       - in: query
+ *         name: types
+ *         description: >
+ *           Filter by question type. Repeat the param or pass a comma-separated
+ *           list (e.g. types=open_ended,true_false).
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *             enum: [multiple_choice, multi_select, open_ended, true_false]
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: sort
+ *         description: Sort by creation date.
+ *         schema:
+ *           type: string
+ *           enum: [newest, oldest]
+ *           default: newest
  *     responses:
  *       200:
  *         description: Quizzes retrieved
@@ -142,6 +171,27 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
 
 /**
  * @openapi
+ * /public/quizzes/{shareToken}:
+ *  get:
+ *    tags:
+ *      - Quiz
+ *    summary: Retrieve a public quiz by its share token
+ *    parameters:
+ *      - in: path
+ *        name: shareToken
+ *        required: true
+ *        schema:
+ *          type: string
+ *          format: uuid
+ *    responses:
+ *      200:
+ *        description: Public quiz retrieved (without answers)
+ *      404:
+ *        description: Quiz not found or not public
+ */
+router.get('/public/quizzes/:shareToken', getPublicQuizController)
+/**
+ * @openapi
  * /quizzes/{id}:
  *   patch:
  *     tags:
@@ -173,6 +223,26 @@ router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
  *         description: Quiz not found
  */
 router.patch('/quizzes/:id', authMiddleware, validate(PatchQuizSchema), patchQuizByIdController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/share/enable:
+ *   patch:
+ *     tags: [Quiz]
+ *     security: [{ cookieAuth: [] }]
+ *     summary: Enable public sharing for a quiz
+ */
+router.patch('/quizzes/:id/share/enable', authMiddleware, enableSharingController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/share/disable:
+ *   patch:
+ *     tags: [Quiz]
+ *     security: [{ cookieAuth: [] }]
+ *     summary: Disable public sharing for a quiz
+ */
+router.patch('/quizzes/:id/share/disable', authMiddleware, disableSharingController)
 
 /**
  * @openapi

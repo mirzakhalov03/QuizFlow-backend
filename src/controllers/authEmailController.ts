@@ -19,7 +19,18 @@ const COOKIE_REFRESH_TOKEN_OPTIONS = {
 const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, fullName, password } = req.body
-    const { accessToken, refreshToken } = await authEmailService.register(email, fullName, password)
+    await authEmailService.register(email, fullName, password)
+
+    return res.json(successResponse('Verification code sent to your email', null))
+  } catch (error) {
+    next(error)
+  }
+}
+
+const confirmRegistration = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, otp } = req.body
+    const { accessToken, refreshToken } = await authEmailService.confirmRegistration(email, otp)
 
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)
@@ -33,7 +44,7 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
 const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body
-    const { user, accessToken, refreshToken } = await authEmailService.login(email, password)
+    const { accessToken, refreshToken } = await authEmailService.login(email, password)
 
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)
@@ -57,8 +68,8 @@ const requestPasswordReset = async (req: Request, res: Response, next: NextFunct
 
 const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { token, password } = req.body
-    await authEmailService.resetPassword(token, password)
+    const { email, token, password } = req.body
+    await authEmailService.resetPassword(email, token, password)
 
     return res.json(successResponse('Password has been reset', null))
   } catch (error) {
@@ -77,10 +88,37 @@ const setPassword = async (req: AuthRequest, res: Response, next: NextFunction) 
   }
 }
 
+const requestDeleteAccount = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await authEmailService.requestDeleteAccount(req.user!.id)
+
+    return res.json(successResponse('Account deletion code sent to your email', null))
+  } catch (error) {
+    next(error)
+  }
+}
+
+const confirmDeleteAccount = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { otp } = req.body
+    await authEmailService.confirmDeleteAccount(req.user!.id, otp)
+
+    res.clearCookie('accessToken')
+    res.clearCookie('refreshToken')
+
+    return res.json(successResponse('Account deleted successfully', null))
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const authEmailController = {
   register,
+  confirmRegistration,
   login,
   requestPasswordReset,
   resetPassword,
   setPassword,
+  requestDeleteAccount,
+  confirmDeleteAccount,
 }

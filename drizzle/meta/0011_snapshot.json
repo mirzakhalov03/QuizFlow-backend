@@ -1,6 +1,6 @@
 {
-  "id": "eb935384-ccc2-471c-9e0a-89a83679b31a",
-  "prevId": "f34ac7c7-cbc5-44e0-b080-fead19b38d5a",
+  "id": "a3536781-4134-4b04-8b20-49f4e6e396fd",
+  "prevId": "5705df23-a513-4f8a-a1b1-fa39d5f7fd37",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -182,6 +182,12 @@
         "request_id": {
           "name": "request_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokens_used": {
+          "name": "tokens_used",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -414,6 +420,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_public": {
+          "name": "is_public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "share_token": {
+          "name": "share_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "properties": {
           "name": "properties",
           "type": "jsonb",
@@ -436,6 +461,12 @@
         "user_instructions": {
           "name": "user_instructions",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_usage": {
+          "name": "token_usage",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -479,7 +510,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "quizzes_share_token_unique": {
+          "name": "quizzes_share_token_unique",
+          "nullsNotDistinct": false,
+          "columns": ["share_token"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -636,6 +673,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'openai'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -773,6 +817,18 @@
           "notNull": true,
           "default": false
         },
+        "ai_feedback": {
+          "name": "ai_feedback",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ai_feedback_generated_at": {
+          "name": "ai_feedback_generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -841,6 +897,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_token_hash": {
+          "name": "password_reset_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_token_expires_at": {
+          "name": "password_reset_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -877,6 +951,11 @@
     }
   },
   "enums": {
+    "public.difficulty": {
+      "name": "difficulty",
+      "schema": "public",
+      "values": ["easy", "medium", "hard"]
+    },
     "public.job_status": {
       "name": "job_status",
       "schema": "public",

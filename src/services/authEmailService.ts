@@ -1,15 +1,17 @@
 import crypto from 'crypto'
 
 import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
 
 import authService from './authService'
 import emailService from './emailService'
 import userService from './userService'
+import { db } from '../database/database'
+import { users } from '../database/schema'
 import { AppError } from '../helpers/AppError'
 import { generateAccessToken, generateRefreshToken } from '../helpers/utils/jwt'
+import Otp, { RESET_EXPIRATION_MS } from '../models/otp.model'
 import User from '../models/user.model'
-
-const RESET_TOKEN_EXPIRATION_MS = 1000 * 60 * 60
 
 const getResetUrl = (token: string) => {
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
@@ -26,24 +28,50 @@ class AuthEmailService {
     return { accessToken, refreshToken }
   }
 
+  // Step 1: Create unverified user and send OTP
   async register(email: string, fullName: string, password: string) {
     const existingUser = await userService.findByEmail(email)
 
-    if (existingUser) {
+    if (existingUser && existingUser.isVerified) {
       throw new AppError('User already exists', 409)
     }
 
-    const user = await userService.createUserWithPassword({
-      email,
-      fullName,
-      password,
-    })
+    if (!existingUser) {
+      await userService.createUserWithPassword({
+        email,
+        fullName,
+        password,
+        isVerified: false,
+      })
+    }
 
+    const code = Otp.generateCode()
+    await Otp.upsert(`register:${email}`, code)
+    await this.sendRegistrationOtpEmail(email, fullName, code)
+  }
+
+  // Step 2: Confirm OTP → activate user → log in
+  async confirmRegistration(email: string, code: string) {
+    const user = await userService.findByEmail(email)
+
+    if (!user) {
+      throw new AppError('No registration found for this email', 400, 'INVALID_OTP')
+    }
+
+    if (user.isVerified) {
+      throw new AppError('Account already verified', 400, 'ALREADY_VERIFIED')
+    }
+
+    const result = await Otp.verify(`register:${email}`, code)
+
+    if (result === 'invalid') throw new AppError('Invalid OTP', 400, 'INVALID_OTP')
+    if (result === 'expired') throw new AppError('OTP has expired', 400, 'OTP_EXPIRED')
+
+    await User.updateUser(user.id, { isVerified: true })
+    await Otp.delete(`register:${email}`)
     await this.sendWelcomeEmail(user.email, user.fullName)
 
-    const tokens = await this.generateTokens(user)
-
-    return { user, ...tokens }
+    return await this.generateTokens(user)
   }
 
   async login(email: string, password: string) {
@@ -53,6 +81,10 @@ class AuthEmailService {
       throw new AppError('Invalid email or password', 401)
     }
 
+    if (!user.isVerified) {
+      throw new AppError('Please verify your email before logging in', 403, 'EMAIL_NOT_VERIFIED')
+    }
+
     const tokens = await this.generateTokens(user)
     return { user, ...tokens }
   }
@@ -60,15 +92,26 @@ class AuthEmailService {
   async requestPasswordReset(email: string) {
     const user = await userService.findByEmail(email)
 
-    if (!user || !user.password) {
+    if (!user) {
+      console.log('[password-reset] user not found:', email)
+      return
+    }
+
+    if (!user.password) {
+      console.log('[password-reset] user has no password (OAuth-only):', email)
+      return
+    }
+
+    if (!user.isVerified) {
+      console.log('[password-reset] user not verified:', email)
       return
     }
 
     const token = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRATION_MS)
-
-    await userService.setPasswordResetToken(user.id, token, expiresAt)
+    await Otp.upsert(`reset:${user.id}`, token, RESET_EXPIRATION_MS)
+    console.log('[password-reset] sending email to:', email)
     await this.sendPasswordResetEmail(user.email, user.fullName, token)
+    console.log('[password-reset] email sent to:', email)
   }
 
   async setPassword(userId: string, password: string) {
@@ -86,16 +129,52 @@ class AuthEmailService {
     await userService.updateUser(userId, { password: passwordHash })
   }
 
-  async resetPassword(token: string, password: string) {
-    const user = await userService.findByPasswordResetToken(token)
+  async resetPassword(email: string, token: string, password: string) {
+    const user = await userService.findByEmail(email)
 
     if (!user) {
       throw new AppError('Invalid or expired password reset token', 400)
     }
 
+    const result = await Otp.verify(`reset:${user.id}`, token)
+
+    if (result === 'invalid') throw new AppError('Invalid or expired password reset token', 400)
+    if (result === 'expired') throw new AppError('Password reset token has expired', 400)
+
     const passwordHash = await bcrypt.hash(password, 10)
     await userService.updateUser(user.id, { password: passwordHash })
-    await userService.clearPasswordResetToken(user.id)
+    await Otp.delete(`reset:${user.id}`)
+  }
+
+  async requestDeleteAccount(userId: string) {
+    const user = await User.findById(userId)
+
+    if (!user) {
+      throw new AppError('User not found', 404)
+    }
+
+    const code = Otp.generateCode()
+    await Otp.upsert(`delete:${userId}`, code)
+    await this.sendDeleteAccountOtpEmail(user.email, user.fullName, code)
+  }
+
+  async confirmDeleteAccount(userId: string, code: string) {
+    const result = await Otp.verify(`delete:${userId}`, code)
+
+    if (result === 'invalid') throw new AppError('Invalid OTP', 400, 'INVALID_OTP')
+    if (result === 'expired') throw new AppError('OTP has expired', 400, 'OTP_EXPIRED')
+
+    await db.delete(users).where(eq(users.id, userId))
+    await Otp.delete(`delete:${userId}`)
+  }
+
+  private async sendRegistrationOtpEmail(email: string, fullName: string, code: string) {
+    await emailService.sendEmail({
+      to: email,
+      subject: 'Your QuizFlow verification code',
+      text: `Hi ${fullName},\n\nYour verification code is: ${code}\n\nIt expires in 15 minutes. If you did not request this, ignore this email.`,
+      html: `<p>Hi ${fullName},</p><p>Your verification code is:</p><h2>${code}</h2><p>It expires in 15 minutes.</p>`,
+    })
   }
 
   private async sendWelcomeEmail(email: string, fullName: string) {
@@ -114,6 +193,15 @@ class AuthEmailService {
       subject: 'Reset your QuizFlow password',
       text: `Hi ${fullName},\n\nYou requested a password reset. Click or paste the link below to set a new password:\n\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
       html: `<p>Hi ${fullName},</p><p>You requested a password reset. Click the link below to set a new password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you did not request this, ignore this email.</p>`,
+    })
+  }
+
+  private async sendDeleteAccountOtpEmail(email: string, fullName: string, code: string) {
+    await emailService.sendEmail({
+      to: email,
+      subject: 'Confirm account deletion',
+      text: `Hi ${fullName},\n\nYour account deletion code is: ${code}\n\nIt expires in 15 minutes. If you did not request this, ignore this email — your account is safe.`,
+      html: `<p>Hi ${fullName},</p><p>Your account deletion confirmation code is:</p><h2>${code}</h2><p>It expires in 15 minutes. If you did not request this, ignore this email — your account is safe.</p>`,
     })
   }
 }

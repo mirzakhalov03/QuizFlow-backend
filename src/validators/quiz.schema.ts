@@ -1,9 +1,14 @@
 import { z } from 'zod'
 
 import { SUPPORTED_MODELS } from '../constants/models'
+import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
+const DifficultyTypeEnum = z.enum(DIFFICULTY_TYPES)
+export const GenerateQuizSourceSchema = z.object({
+  source: z.enum(['file', 'notion']).default('file'),
+})
 
 export const GenerateQuizSchema = z
   .object({
@@ -51,8 +56,23 @@ export const GenerateQuizSchema = z
 
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
+
+    difficulty: DifficultyTypeEnum.optional(),
+
+    apiKeyId: z.uuid().optional(),
   })
   .superRefine((data, ctx) => {
+    const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
+    const hasNotionSource = data.pageIds && data.pageIds.length > 0
+
+    if (!hasFileSource && !hasNotionSource) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['pageIds'],
+        message: 'Either pageIds (for notion) or s3Url/key/keys (for file) is required',
+      })
+    }
+
     if (data.isTimerEnabled && !data.timerDuration) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -96,6 +116,22 @@ export const PatchQuizSchema = z
 
 export type PatchQuizInput = z.infer<typeof PatchQuizSchema>
 
+/**
+ * Filter by one or more question types. Accepts a repeated `types` param
+ * (`?types=open_ended&types=true_false`) or a comma-separated list
+ * (`?types=open_ended,true_false`). Normalised to a deduped array.
+ */
+const QuestionTypesFilter = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined
+  const raw = Array.isArray(val) ? val.flatMap((v) => String(v).split(',')) : String(val).split(',')
+  const cleaned = new Set<string>()
+  for (const v of raw) {
+    const trimmed = v.trim()
+    if (trimmed) cleaned.add(trimmed)
+  }
+  return cleaned.size > 0 ? [...cleaned] : undefined
+}, z.array(QuestionTypeEnum).max(QUESTION_TYPES.length).optional())
+
 export const GetQuizzesSchema = z.object({
   limit: z.coerce
     .number()
@@ -105,6 +141,10 @@ export const GetQuizzesSchema = z.object({
     .default(20),
   offset: z.coerce.number().int().min(0, 'offset must be a non-negative integer').default(0),
   search: z.string().trim().min(1).optional(),
+  /** Filter quizzes by question type. */
+  types: QuestionTypesFilter,
+  /** Sort by creation date: newest first (default) or oldest first. */
+  sort: z.enum(['newest', 'oldest']).default('newest'),
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>

@@ -1,6 +1,6 @@
 {
-  "id": "f34ac7c7-cbc5-44e0-b080-fead19b38d5a",
-  "prevId": "4b44e6fd-91fb-42bf-8c94-993f4b3067fa",
+  "id": "5705df23-a513-4f8a-a1b1-fa39d5f7fd37",
+  "prevId": "eb935384-ccc2-471c-9e0a-89a83679b31a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -636,6 +636,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -766,6 +772,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_onboarded": {
+          "name": "is_onboarded",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -831,6 +844,24 @@
         "refresh_token": {
           "name": "refresh_token",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_token_hash": {
+          "name": "password_reset_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_token_expires_at": {
+          "name": "password_reset_token_expires_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },

@@ -1,5 +1,3 @@
-import crypto from 'crypto'
-
 import bcrypt from 'bcryptjs'
 
 import User from '../models/user.model'
@@ -10,8 +8,6 @@ type GoogleProfile = {
   picture?: string
   [key: string]: unknown
 }
-
-const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
 
 class UserService {
   async findByEmail(email: string) {
@@ -25,13 +21,19 @@ class UserService {
     })
   }
 
-  async createUserWithPassword(data: { email: string; fullName: string; password: string }) {
+  async createUserWithPassword(data: {
+    email: string
+    fullName: string
+    password: string
+    isVerified?: boolean
+  }) {
     const passwordHash = await bcrypt.hash(data.password, 10)
 
     return await User.createUser({
       email: data.email,
       fullName: data.fullName,
       password: passwordHash,
+      isVerified: data.isVerified ?? false,
     })
   }
 
@@ -46,11 +48,17 @@ class UserService {
   async findOrCreateByGoogle(profile: GoogleProfile) {
     const existingUser = await this.findByEmail(profile.email)
 
-    if (existingUser) return existingUser
+    if (existingUser) {
+      if (!existingUser.isVerified) {
+        await User.updateUser(existingUser.id, { isVerified: true })
+      }
+      return existingUser
+    }
 
-    return await this.createUser({
+    return await User.createUser({
       email: profile.email,
       fullName: profile.name,
+      isVerified: true,
     })
   }
 
@@ -60,31 +68,10 @@ class UserService {
       fullName?: string
       password?: string | null
       refreshToken?: string | null
-      passwordResetTokenHash?: string | null
-      passwordResetTokenExpiresAt?: Date | null
+      isVerified?: boolean
     },
   ) {
     return await User.updateUser(id, data)
-  }
-
-  async setPasswordResetToken(id: string, token: string, expiresAt: Date) {
-    const tokenHash = hashToken(token)
-    return await User.updateUser(id, {
-      passwordResetTokenHash: tokenHash,
-      passwordResetTokenExpiresAt: expiresAt,
-    })
-  }
-
-  async findByPasswordResetToken(token: string) {
-    const tokenHash = hashToken(token)
-    return await User.findByPasswordResetTokenHash(tokenHash)
-  }
-
-  async clearPasswordResetToken(id: string) {
-    return await User.updateUser(id, {
-      passwordResetTokenHash: null,
-      passwordResetTokenExpiresAt: null,
-    })
   }
 }
 

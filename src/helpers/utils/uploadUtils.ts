@@ -11,7 +11,6 @@ export const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
-  'application/msword', // .doc
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
   'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
 ]

@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { users } from '../database/schema'
@@ -11,8 +11,7 @@ export default class User {
   updatedAt: Date
   refreshToken: string | null
   password: string | null
-  passwordResetTokenHash: string | null
-  passwordResetTokenExpiresAt: Date | null
+  isVerified: boolean
 
   constructor(
     id: string,
@@ -22,8 +21,7 @@ export default class User {
     updatedAt: Date,
     refreshToken: string | null,
     password: string | null,
-    passwordResetTokenHash: string | null,
-    passwordResetTokenExpiresAt: Date | null,
+    isVerified: boolean,
   ) {
     this.id = id
     this.email = email
@@ -32,96 +30,43 @@ export default class User {
     this.updatedAt = updatedAt
     this.refreshToken = refreshToken
     this.password = password
-    this.passwordResetTokenHash = passwordResetTokenHash
-    this.passwordResetTokenExpiresAt = passwordResetTokenExpiresAt
+    this.isVerified = isVerified
+  }
+
+  private static fromRow(row: typeof users.$inferSelect): User {
+    return new User(
+      row.id,
+      row.email,
+      row.fullName,
+      row.createdAt,
+      row.updatedAt,
+      row.refreshToken ?? null,
+      row.password ?? null,
+      row.isVerified,
+    )
   }
 
   static async createUser(userData: {
     email: string
     fullName: string
-    createdAt?: Date
-    updatedAt?: Date
-    refreshToken?: string | null
     password?: string | null
-    passwordResetTokenHash?: string | null
-    passwordResetTokenExpiresAt?: Date | null
+    isVerified?: boolean
+    refreshToken?: string | null
   }): Promise<User> {
     const [newUser] = await db.insert(users).values(userData).returning()
-
-    return new User(
-      newUser.id,
-      newUser.email,
-      newUser.fullName,
-      newUser.createdAt,
-      newUser.updatedAt,
-      newUser.refreshToken,
-      newUser.password ?? null,
-      newUser.passwordResetTokenHash ?? null,
-      newUser.passwordResetTokenExpiresAt ?? null,
-    )
+    return this.fromRow(newUser)
   }
 
   static async findByEmail(email: string): Promise<User | null> {
     const rows = await db.select().from(users).where(eq(users.email, email))
-    const userRow = rows[0]
-    if (!userRow) return null
-
-    return new User(
-      userRow.id,
-      userRow.email,
-      userRow.fullName,
-      userRow.createdAt,
-      userRow.updatedAt,
-      userRow.refreshToken,
-      userRow.password ?? null,
-      userRow.passwordResetTokenHash ?? null,
-      userRow.passwordResetTokenExpiresAt ?? null,
-    )
+    if (!rows[0]) return null
+    return this.fromRow(rows[0])
   }
 
   static async findById(id: string): Promise<User | null> {
     const rows = await db.select().from(users).where(eq(users.id, id))
-    const userRow = rows[0]
-    if (!userRow) return null
-
-    return new User(
-      userRow.id,
-      userRow.email,
-      userRow.fullName,
-      userRow.createdAt,
-      userRow.updatedAt,
-      userRow.refreshToken,
-      userRow.password ?? null,
-      userRow.passwordResetTokenHash ?? null,
-      userRow.passwordResetTokenExpiresAt ?? null,
-    )
-  }
-
-  static async findByPasswordResetTokenHash(tokenHash: string): Promise<User | null> {
-    const rows = await db
-      .select()
-      .from(users)
-      .where(
-        and(
-          eq(users.passwordResetTokenHash, tokenHash),
-          gt(users.passwordResetTokenExpiresAt, new Date()),
-        ),
-      )
-    const userRow = rows[0]
-
-    if (!userRow) return null
-
-    return new User(
-      userRow.id,
-      userRow.email,
-      userRow.fullName,
-      userRow.createdAt,
-      userRow.updatedAt,
-      userRow.refreshToken,
-      userRow.password ?? null,
-      userRow.passwordResetTokenHash ?? null,
-      userRow.passwordResetTokenExpiresAt ?? null,
-    )
+    if (!rows[0]) return null
+    return this.fromRow(rows[0])
   }
 
   static async updateUser(
@@ -131,31 +76,16 @@ export default class User {
       fullName?: string
       refreshToken?: string | null
       password?: string | null
-      passwordResetTokenHash?: string | null
-      passwordResetTokenExpiresAt?: Date | null
+      isVerified?: boolean
     },
   ): Promise<User | null> {
     const [updated] = await db
       .update(users)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning()
 
     if (!updated) return null
-
-    return new User(
-      updated.id,
-      updated.email,
-      updated.fullName,
-      updated.createdAt,
-      updated.updatedAt,
-      updated.refreshToken,
-      updated.password ?? null,
-      updated.passwordResetTokenHash ?? null,
-      updated.passwordResetTokenExpiresAt ?? null,
-    )
+    return this.fromRow(updated)
   }
 }

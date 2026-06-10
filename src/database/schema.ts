@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 import { relations } from 'drizzle-orm'
 import {
   jsonb,
@@ -12,9 +14,11 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
+import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -22,13 +26,20 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   refreshToken: text('refresh_token').unique(),
   password: text('password'),
-  passwordResetTokenHash: text('password_reset_token_hash'),
-  passwordResetTokenExpiresAt: timestamp('password_reset_token_expires_at', { mode: 'date' }),
+  isVerified: boolean('is_verified').notNull().default(false),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+})
+
+export const otps = pgTable('otps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').notNull().unique(),
+  code: text('code').notNull(),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
 })
 
 export const userProfiles = pgTable('user_profiles', {
@@ -71,6 +82,7 @@ export const userApiKeys = pgTable('user_api_keys', {
     .references(() => users.id, { onDelete: 'cascade' }),
   keyName: text('key_name').notNull(),
   keyValue: text('key_value').notNull(),
+  provider: text('provider').notNull().default('openai'),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
@@ -87,10 +99,16 @@ export const quizzes = pgTable('quizzes', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   type: questionTypeEnum('type'),
+  isPublic: boolean('is_public').notNull().default(false),
+  shareToken: text('share_token')
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
+  difficulty: text('difficulty'),
   properties: jsonb('properties').notNull(),
   isTimerEnabled: boolean('is_timer_enabled').notNull().default(false),
   timerDuration: integer('timer_duration'),
   userInstructions: text('user_instructions'),
+  tokenUsage: jsonb('token_usage'),
   completedAt: timestamp('completed_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   uploadedAt: timestamp('uploaded_at', { mode: 'date' }),
@@ -197,6 +215,7 @@ export const quizJobs = pgTable(
     quizId: uuid('quiz_id').references(() => quizzes.id, { onDelete: 'set null' }),
     status: jobStatusEnum('status').notNull().default('pending'),
     requestId: text('request_id'),
+    tokensUsed: jsonb('tokens_used'),
     error: text('error'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
