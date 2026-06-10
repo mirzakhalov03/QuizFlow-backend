@@ -133,7 +133,7 @@ export const handler = async (event: LambdaEvent) => {
     const sourceText = sourceTexts.join('\n\n---\n\n')
 
     let apiKey
-    if (event.apiKeyId) apiKey = await getByokById(event.apiKeyId, event.userId)
+    if (event.apiKeyId) apiKey = await getByokById(event.apiKeyId, event.userId, db)
 
     const result = event.quiz
       ? { quiz: event.quiz }
