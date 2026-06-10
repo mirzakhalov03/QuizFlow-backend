@@ -77,3 +77,12 @@ export const deleteByok = async (id: string, userId: string) => {
 
   return deleted.length > 0
 }
+
+export const getByokById = async (id: string, userId: string) => {
+  const row = await db
+    .select({ encryptedKeyValue: userApiKeys.keyValue })
+    .from(userApiKeys)
+    .where(and(eq(userApiKeys.id, id), eq(userApiKeys.userId, userId)))
+
+  return decryptApiKeyValue(row[0]?.encryptedKeyValue)
+}

@@ -17,6 +17,7 @@ type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  apiKeyId?: string
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -72,6 +73,7 @@ class NotionQuizService {
         timerDuration: input.timerDuration,
         type: input.type,
         questionCount: input.questionCount,
+        apiKeyId: input.apiKeyId,
       })
 
       return {

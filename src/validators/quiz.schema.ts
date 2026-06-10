@@ -58,6 +58,8 @@ export const GenerateQuizSchema = z
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
     difficulty: DifficultyTypeEnum.optional(),
+
+    apiKeyId: z.uuid().optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
