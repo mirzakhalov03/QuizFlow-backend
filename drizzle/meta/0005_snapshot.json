@@ -1,9 +1,60 @@
 {
-  "id": "93148859-8227-41af-9d33-aa5211a1b4cd",
-  "prevId": "cd5d8234-69c1-4781-bc1f-f16ae87206c5",
+  "id": "efcaa69d-9e34-435b-90dd-3aeace4c21b0",
+  "prevId": "a3536781-4134-4b04-8b20-49f4e6e396fd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.otps": {
+      "name": "otps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "otps_key_unique": {
+          "name": "otps_key_unique",
+          "nullsNotDistinct": false,
+          "columns": ["key"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.question_options": {
       "name": "question_options",
       "schema": "",
@@ -185,6 +236,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "tokens_used": {
+          "name": "tokens_used",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "error": {
           "name": "error",
           "type": "text",
@@ -304,6 +361,14 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "grading_status": {
+          "name": "grading_status",
+          "type": "grading_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'complete'"
         },
         "created_at": {
           "name": "created_at",
@@ -547,6 +612,12 @@
         "text_answer": {
           "name": "text_answer",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_correct": {
+          "name": "is_correct",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -897,17 +968,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "password_reset_token_hash": {
-          "name": "password_reset_token_hash",
-          "type": "text",
+        "is_verified": {
+          "name": "is_verified",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
-        },
-        "password_reset_token_expires_at": {
-          "name": "password_reset_token_expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -949,6 +1015,11 @@
       "name": "difficulty",
       "schema": "public",
       "values": ["easy", "medium", "hard"]
+    },
+    "public.grading_status": {
+      "name": "grading_status",
+      "schema": "public",
+      "values": ["complete", "pending", "failed"]
     },
     "public.job_status": {
       "name": "job_status",

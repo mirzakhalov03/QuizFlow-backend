@@ -13,8 +13,8 @@ import {
   streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
 import { getByokById } from '../services/byok.service'
-import { generateQuizFromText } from '../services/quizAi'
-import type { AiQuiz, AiQuizResult } from '../services/quizAi'
+import { generateQuizFromText } from '../services/helpers/quizAi'
+import type { AiQuiz, AiQuizResult } from '../services/helpers/quizAi'
 import type { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
 // Lambda-local clients — no Express app dependencies, no credential env vars required

@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 
-import { publishFeedbackJob } from '../services/feedbackProducer'
-import { getEligibleUserIds } from '../services/feedbackService'
+import { getEligibleUserIds } from '../services/feedback.service'
+import { publishFeedbackJob } from '../services/helpers/feedbackProducer'
 
 // Runs every night at 2am
 const CRON_SCHEDULE = '0 2 * * *'

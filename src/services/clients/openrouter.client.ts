@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 
-import { AppError } from '../helpers/AppError'
+import { AppError } from '../../helpers/AppError'
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
