@@ -224,20 +224,29 @@ export const getQuizResult = async (quizId: string, userId: string) => {
 
   if (!result) return null
 
-  // Per-answer verdicts for graded questions (open-ended). isCorrect is null
-  // until graded, so only non-null rows are returned.
-  const verdictRows = await db
+  // One pass over the user's stored answers yields both the per-answer verdicts
+  // (graded open-ended) and the raw answers used to rebuild the review on refresh.
+  const answerRows = await db
     .select({
       questionId: userAnswers.questionId,
       isCorrect: userAnswers.isCorrect,
+      selectedOptionId: userAnswers.selectedOptionId,
+      textAnswer: userAnswers.textAnswer,
     })
     .from(userAnswers)
     .innerJoin(questions, eq(questions.id, userAnswers.questionId))
     .where(and(eq(questions.quizId, quizId), eq(userAnswers.userId, userId)))
 
-  const verdicts = verdictRows
+  // isCorrect is null until graded, so only non-null rows become verdicts.
+  const verdicts = answerRows
     .filter((r) => r.isCorrect !== null)
     .map((r) => ({ questionId: r.questionId, isCorrect: r.isCorrect as boolean }))
 
-  return { result, verdicts }
+  const answers = answerRows.map((r) => ({
+    questionId: r.questionId,
+    selectedOptionId: r.selectedOptionId ?? undefined,
+    textAnswer: r.textAnswer ?? undefined,
+  }))
+
+  return { result, verdicts, answers }
 }
