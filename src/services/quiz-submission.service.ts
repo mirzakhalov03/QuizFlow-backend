@@ -32,6 +32,7 @@ type ScoreResult = {
  * Auto-gradable questions (multiple-choice, true/false) are scored here.
  * Open-ended questions count toward `totalQuestions` from submit time (stable
  * denominator) but start as not-yet-correct — the async grader adds them later.
+ * Assumes `answers` is already deduped (at most one entry per question).
  * Throws if a selected option does not belong to its question.
  */
 const scoreAnswers = (
@@ -39,24 +40,19 @@ const scoreAnswers = (
   answers: SubmitAnswerInput[],
   optionsById: Map<string, SelectedOption>,
 ): ScoreResult => {
-  const autoGradableIds = new Set(
-    quizQuestions.filter((q) => q.type !== 'open_ended').map((q) => q.id),
-  )
-  const openEndedIds = new Set(
-    quizQuestions.filter((q) => q.type === 'open_ended').map((q) => q.id),
-  )
+  // Single pass: split question ids by gradability.
+  const autoGradableIds = new Set<string>()
+  const openEndedIds = new Set<string>()
+  for (const q of quizQuestions) {
+    if (q.type === 'open_ended') openEndedIds.add(q.id)
+    else autoGradableIds.add(q.id)
+  }
 
   const correctnessByQuestion = new Map<string, boolean>()
-  const scoredQuestions = new Set<string>()
   let correctAnswers = 0
 
   for (const answer of answers) {
-    if (scoredQuestions.has(answer.questionId)) continue
-
-    if (!answer.selectedOptionId) {
-      scoredQuestions.add(answer.questionId)
-      continue
-    }
+    if (!answer.selectedOptionId) continue
 
     const option = optionsById.get(answer.selectedOptionId)
     if (!option || option.questionId !== answer.questionId) {
@@ -71,8 +67,6 @@ const scoreAnswers = (
       correctnessByQuestion.set(answer.questionId, option.isCorrect)
       if (option.isCorrect) correctAnswers += 1
     }
-
-    scoredQuestions.add(answer.questionId)
   }
 
   const totalQuestions = autoGradableIds.size + openEndedIds.size
@@ -91,7 +85,11 @@ const scoreAnswers = (
   }
 }
 
-export const submitQuiz = async (quizId: string, userId: string, answers: SubmitAnswerInput[]) => {
+export const submitQuiz = async (
+  quizId: string,
+  userId: string,
+  rawAnswers: SubmitAnswerInput[],
+) => {
   const [quiz] = await db
     .select({ id: quizzes.id })
     .from(quizzes)
@@ -99,6 +97,15 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
     .limit(1)
 
   if (!quiz) return null
+
+  // Keep only the first answer per question. A client could send duplicates,
+  // and (userId, questionId) is unique — duplicates would break the insert below.
+  const seenQuestionIds = new Set<string>()
+  const answers = rawAnswers.filter((answer) => {
+    if (seenQuestionIds.has(answer.questionId)) return false
+    seenQuestionIds.add(answer.questionId)
+    return true
+  })
 
   const quizQuestions = await db
     .select({ id: questions.id, type: questions.type })
@@ -111,10 +118,9 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
 
   const questionsById = new Map(quizQuestions.map((q) => [q.id, q]))
 
-  // First pass: validate every answer targets a question in this quiz and
-  // collect the (deduped) option ids we need to fetch for scoring.
+  // Validate every answer targets a question in this quiz and collect the
+  // option ids we need to fetch for scoring.
   const selectedOptionIds: string[] = []
-  const seenQuestionIds = new Set<string>()
 
   for (const answer of answers) {
     if (!questionsById.has(answer.questionId)) {
@@ -124,9 +130,6 @@ export const submitQuiz = async (quizId: string, userId: string, answers: Submit
         'VALIDATION_ERROR',
       )
     }
-
-    if (seenQuestionIds.has(answer.questionId)) continue
-    seenQuestionIds.add(answer.questionId)
 
     if (answer.selectedOptionId) selectedOptionIds.push(answer.selectedOptionId)
   }
