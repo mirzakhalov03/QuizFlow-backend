@@ -1,5 +1,10 @@
-import { generateFeedbackForUser } from '../services/feedbackService'
-import { getRabbitMQChannel, FEEDBACK_QUEUE, FEEDBACK_DLQ, MAX_RETRIES } from '../services/rabbitmq'
+import {
+  getRabbitMQChannel,
+  FEEDBACK_QUEUE,
+  FEEDBACK_DLQ,
+  MAX_RETRIES,
+} from '../services/clients/rabbitmq.client'
+import { generateFeedbackForUser } from '../services/feedback.service'
 
 const startFeedbackWorker = async (): Promise<void> => {
   const channel = await getRabbitMQChannel()

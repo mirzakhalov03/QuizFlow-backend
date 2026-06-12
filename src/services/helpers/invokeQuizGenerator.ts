@@ -1,12 +1,12 @@
 import { InvokeCommand, type InvokeCommandOutput } from '@aws-sdk/client-lambda'
 import { eq } from 'drizzle-orm'
 
-import { lambdaClient } from './lambdaClient'
-import { db } from '../database/database'
-import { quizJobs } from '../database/schema'
-import { AppError } from '../helpers/AppError'
-import type { DifficultyType } from '../types/difficultyTypes'
-import type { QuestionType } from '../types/questionTypes'
+import { db } from '../../database/database'
+import { quizJobs } from '../../database/schema'
+import { AppError } from '../../helpers/AppError'
+import type { DifficultyType } from '../../types/difficultyTypes'
+import type { QuestionType } from '../../types/questionTypes'
+import { lambdaClient } from '../clients/lambda.client'
 type QuizGeneratePayload = {
   userId: string
   bucket: string

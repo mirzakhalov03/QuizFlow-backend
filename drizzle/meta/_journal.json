@@ -36,6 +36,20 @@
       "when": 1780657429554,
       "tag": "0004_fuzzy_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781095581131,
+      "tag": "0005_tan_wild_child",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781200000000,
+      "tag": "0006_open_ended_grading",
+      "breakpoints": true
     }
   ]
 }

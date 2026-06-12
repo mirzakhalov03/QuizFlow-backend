@@ -1,6 +1,6 @@
 import { eq, lt, isNull, or } from 'drizzle-orm'
 
-import { chatJSON } from './openRouter'
+import { chatJSON } from './clients/openrouter.client'
 import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
 import { userProfiles } from '../database/schema'
@@ -9,6 +9,7 @@ import QuestionOption from '../models/questionOption.model'
 import Quiz from '../models/quiz.model'
 import UserAnswer from '../models/userAnswer.model'
 import UserApiKey from '../models/userApiKey.model'
+import { FEEDBACK_SYSTEM_PROMPT } from '../prompts'
 
 const MIN_QUIZ_COUNT = 3
 const FEEDBACK_COOLDOWN_DAYS = 7
@@ -168,31 +169,7 @@ export const generateFeedbackForUser = async (userId: string): Promise<void> => 
     messages: [
       {
         role: 'system',
-        content: [
-          "You are an expert learning coach analyzing a student's quiz performance to help them improve.",
-          '',
-          '## Your task',
-          'Based on the quiz history provided, generate structured feedback with three parts:',
-          "1. summary — A 3-4 sentence paragraph overview of the student's overall performance. Mention their strongest areas and most critical weaknesses. Be honest but encouraging.",
-          '2. weakTopics — A list of 3-5 specific topics or concepts the student consistently struggles with, derived directly from their wrong answers. Each item should be a short noun phrase (e.g. "SQL JOIN operations", "React component lifecycle"). Do NOT list vague topics like "general knowledge".',
-          '3. recommendations — A list of 3-5 concrete, actionable study steps the student should take. Each recommendation must be specific and tied to their actual mistakes (e.g. "Review how INNER JOIN differs from LEFT JOIN using the quizzes where you confused them"). Do NOT write generic advice like "study more" or "practice regularly".',
-          '',
-          '## Length rules',
-          '- summary: minimum 3 sentences, maximum 5 sentences. Never a single sentence.',
-          '- weakTopics: minimum 3 items, maximum 5 items. Each item 2-6 words.',
-          '- recommendations: minimum 3 items, maximum 5 items. Each item 1-2 sentences, specific and actionable.',
-          '',
-          '## Bad response example (DO NOT do this)',
-          '{ "summary": "You did okay.", "weakTopics": ["math", "science"], "recommendations": ["Study more", "Practice"] }',
-          '',
-          '## Good response example',
-          '{ "summary": "You demonstrated solid understanding of basic HTML structure, scoring well on tag-related questions. However, you consistently struggled with CSS specificity rules and flexbox alignment, missing 4 out of 5 questions in those areas. Your performance on JavaScript async concepts was mixed — you understand callbacks but confused Promises with async/await syntax. Focus your next study session on CSS layout and JS async patterns.", "weakTopics": ["CSS specificity and selector priority", "Flexbox and grid alignment", "JavaScript Promise chaining", "Async/await error handling"], "recommendations": ["Re-read the MDN CSS specificity guide and practice the 3 quizzes where you missed selector priority questions", "Build a small flexbox layout from scratch to solidify row vs column axis confusion seen in quiz 2", "Write 5 Promise chains manually before converting them to async/await to understand the relationship"] }',
-          '',
-          '## Important',
-          '- Only reference topics that actually appear in the quiz data provided.',
-          '- Do not invent mistakes the student did not make.',
-          '- Do not repeat the same point across weakTopics and recommendations.',
-        ].join('\n'),
+        content: FEEDBACK_SYSTEM_PROMPT,
       },
       {
         role: 'user',

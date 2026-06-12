@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import notionService from '../services/notionService'
+import notionService from '../services/notion.service'
 
 export const getNotionPages = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

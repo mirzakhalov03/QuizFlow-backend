@@ -18,6 +18,7 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+export const gradingStatusEnum = pgEnum('grading_status', ['complete', 'pending', 'failed'])
 export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
 
 export const users = pgTable('users', {
@@ -163,6 +164,7 @@ export const userAnswers = pgTable(
       onDelete: 'cascade',
     }),
     textAnswer: text('text_answer'),
+    isCorrect: boolean('is_correct'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
       .defaultNow()
@@ -192,6 +194,7 @@ export const quizResults = pgTable(
     totalQuestions: integer('total_questions').notNull(),
     correctAnswers: integer('correct_answers').notNull(),
     wrongAnswers: integer('wrong_answers').notNull(),
+    gradingStatus: gradingStatusEnum('grading_status').notNull().default('complete'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
       .defaultNow()
