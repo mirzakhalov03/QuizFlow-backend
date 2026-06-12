@@ -10,7 +10,8 @@ export const quizGenerationLimiter = rateLimit({
   legacyHeaders: false,
   // Key by authenticated userId; fall back to a normalized IP key (the helper
   // collapses IPv6 ranges so users can't bypass the limit by cycling addresses).
-  keyGenerator: (req) => (req as AuthRequest).user?.id ?? ipKeyGenerator(req.ip ?? 'anonymous'),
+  keyGenerator: (req) =>
+    (req as AuthRequest).user?.id ?? (req.ip ? ipKeyGenerator(req.ip) : 'anonymous'),
   handler: (_req, _res, next) => {
     next(
       new AppError(

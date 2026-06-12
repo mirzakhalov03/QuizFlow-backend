@@ -21,8 +21,11 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
       ? (err as { code?: string }).code
       : 'INTERNAL_ERROR'
 
+  // Log the real error internally (prod sanitizes `message` to 'Something went
+  // wrong' for the client, but the server log needs the actual detail).
   const log = req.log ?? logger
-  log.error(message, {
+  const logMessage = err instanceof Error ? err.message : String(err)
+  log.error(logMessage, {
     code,
     statusCode,
     stack: err instanceof Error ? err.stack : undefined,
