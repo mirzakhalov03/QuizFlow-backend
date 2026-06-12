@@ -156,8 +156,12 @@ class NotionService {
           // silently skip unreadable databases
         }
       } else if (block.type === 'child_page') {
-        this.push(content, state, `## ${block.child_page.title || 'Untitled Subpage'}`)
-        await this.fetchBlocksContent(notion, block.id, content, state, depth + 1)
+        this.push(content, state, '## ' + (block.child_page.title || 'Untitled Subpage'))
+        try {
+          await this.fetchBlocksContent(notion, block.id, content, state, depth + 1)
+        } catch {
+          // silently skip unreadable subpages
+        }
       } else if (block.type === 'table') {
         const tableRows = await notion.blocks.children.list({ block_id: block.id, page_size: 100 })
         for (const row of tableRows.results) {
