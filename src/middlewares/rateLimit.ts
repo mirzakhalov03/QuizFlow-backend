@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 
 import type { AuthRequest } from './authMiddleware'
 import { AppError } from '../helpers/AppError'
@@ -8,7 +8,9 @@ export const quizGenerationLimiter = rateLimit({
   limit: 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  keyGenerator: (req) => (req as AuthRequest).user?.id ?? req.ip ?? 'anonymous',
+  // Key by authenticated userId; fall back to a normalized IP key (the helper
+  // collapses IPv6 ranges so users can't bypass the limit by cycling addresses).
+  keyGenerator: (req) => (req as AuthRequest).user?.id ?? ipKeyGenerator(req.ip ?? 'anonymous'),
   handler: (_req, _res, next) => {
     next(
       new AppError(
