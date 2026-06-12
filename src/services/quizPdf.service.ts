@@ -26,7 +26,6 @@ const TYPE_LABEL: Record<QuestionType, string> = {
   multi_select: 'Multi-select',
   open_ended: 'Open-ended',
   true_false: 'True / false',
-  mixed: 'Mixed',
 }
 
 /** Escape user-supplied text so it can't break or inject into the HTML. */
@@ -164,16 +163,24 @@ export function buildQuizHtml(quiz: PdfQuiz): string {
 </html>`
 }
 
+let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
+
+async function getBrowser() {
+  if (!browserInstance || !browserInstance.connected) {
+    browserInstance = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    })
+  }
+  return browserInstance
+}
+
 /** Render the quiz HTML to a PDF buffer using headless Chromium. */
 export async function generateQuizPdf(quiz: PdfQuiz): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  })
-
+  const browser = await getBrowser()
+  const page = await browser.newPage()
   try {
-    const page = await browser.newPage()
-    await page.setContent(buildQuizHtml(quiz), { waitUntil: 'networkidle0' })
+    await page.setContent(buildQuizHtml(quiz), { waitUntil: 'domcontentloaded' })
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
@@ -181,6 +188,6 @@ export async function generateQuizPdf(quiz: PdfQuiz): Promise<Buffer> {
     })
     return Buffer.from(pdf)
   } finally {
-    await browser.close()
+    await page.close()
   }
 }
