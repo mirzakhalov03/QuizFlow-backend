@@ -1,7 +1,6 @@
 import {
   getRabbitMQChannel,
   FEEDBACK_QUEUE,
-  FEEDBACK_DLQ,
   MAX_RETRIES,
 } from '../services/clients/rabbitmq.client'
 import { generateFeedbackForUser } from '../services/feedback.service'
