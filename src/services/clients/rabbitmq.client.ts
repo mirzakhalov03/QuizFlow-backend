@@ -1,5 +1,7 @@
 import amqplib, { type Channel } from 'amqplib'
 
+import { logger } from '../../config/logger'
+
 const RABBITMQ_URL = process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'
 const RECONNECT_DELAY_MS = 5000
 
@@ -30,16 +32,16 @@ const connect = async (): Promise<void> => {
   await setupQueues(channel)
 
   connection.on('error', (err) => {
-    console.error('[RabbitMQ] Connection error:', err.message)
+    logger.error('RabbitMQ connection error', { error: err.message })
     scheduleReconnect()
   })
 
   connection.on('close', () => {
-    console.warn('[RabbitMQ] Connection closed, reconnecting...')
+    logger.warn('RabbitMQ connection closed, reconnecting')
     scheduleReconnect()
   })
 
-  console.log('[RabbitMQ] Connected')
+  logger.info('RabbitMQ connected')
 }
 
 const scheduleReconnect = (): void => {
@@ -49,12 +51,14 @@ const scheduleReconnect = (): void => {
   connection = null
 
   setTimeout(async () => {
-    console.log('[RabbitMQ] Attempting to reconnect...')
+    logger.info('RabbitMQ attempting to reconnect')
     try {
       await connect()
       isReconnecting = false
     } catch (err) {
-      console.error('[RabbitMQ] Reconnect failed:', err)
+      logger.error('RabbitMQ reconnect failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
       isReconnecting = false
       scheduleReconnect()
     }

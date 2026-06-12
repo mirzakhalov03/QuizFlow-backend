@@ -1,3 +1,4 @@
+import { logger } from '../config/logger'
 import {
   getRabbitMQChannel,
   FEEDBACK_QUEUE,
@@ -11,7 +12,7 @@ const startFeedbackWorker = async (): Promise<void> => {
   // Process one message at a time
   channel.prefetch(1)
 
-  console.log('[feedbackWorker] Waiting for messages...')
+  logger.info('feedbackWorker waiting for messages', { worker: 'feedbackWorker' })
 
   channel.consume(FEEDBACK_QUEUE, async (msg) => {
     if (!msg) return
@@ -19,17 +20,24 @@ const startFeedbackWorker = async (): Promise<void> => {
     const { userId } = JSON.parse(msg.content.toString()) as { userId: string }
     const retryCount = (msg.properties.headers?.retryCount as number) ?? 0
 
-    console.log(
-      `[feedbackWorker] Processing userId=${userId} (attempt ${retryCount + 1}/${MAX_RETRIES})`,
-    )
+    logger.info('feedbackWorker processing', {
+      worker: 'feedbackWorker',
+      userId,
+      attempt: retryCount + 1,
+      maxRetries: MAX_RETRIES,
+    })
 
     try {
       await generateFeedbackForUser(userId)
       channel.ack(msg)
-      console.log(`[feedbackWorker] Done userId=${userId}`)
+      logger.info('feedbackWorker done', { worker: 'feedbackWorker', userId })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error(`[feedbackWorker] Failed userId=${userId}:`, errorMessage)
+      logger.error('feedbackWorker failed', {
+        worker: 'feedbackWorker',
+        userId,
+        error: errorMessage,
+      })
 
       if (retryCount < MAX_RETRIES - 1) {
         // Requeue with incremented retry count
@@ -40,7 +48,10 @@ const startFeedbackWorker = async (): Promise<void> => {
         })
       } else {
         // Max retries reached — send to DLQ
-        console.error(`[feedbackWorker] Max retries reached for userId=${userId}, sending to DLQ`)
+        logger.error('feedbackWorker max retries, sending to DLQ', {
+          worker: 'feedbackWorker',
+          userId,
+        })
         channel.nack(msg, false, false)
       }
     }
@@ -48,6 +59,9 @@ const startFeedbackWorker = async (): Promise<void> => {
 }
 
 startFeedbackWorker().catch((error) => {
-  console.error('[feedbackWorker] Failed to start:', error)
+  logger.error('feedbackWorker failed to start', {
+    worker: 'feedbackWorker',
+    error: error instanceof Error ? error.message : String(error),
+  })
   process.exit(1)
 })

@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node'
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 
+import { logger } from '../config/logger'
 import User from '../models/user.model'
 
 type AuthTokenPayload = {
@@ -41,6 +42,8 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       fullName: user.fullName,
       hasPassword: user.password !== null,
     }
+
+    req.log = (req.log ?? logger).child({ userId: user.id })
 
     Sentry.setUser({
       id: user.id,

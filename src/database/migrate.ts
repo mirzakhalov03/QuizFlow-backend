@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 
+import { logger } from '../config/logger'
 import { getDatabaseRejectUnauthorized } from '../helpers/utils/dbSsl'
 
 /**
@@ -33,14 +34,14 @@ async function main() {
 
   const db = drizzle(pool)
 
-  console.log('Applying migrations…')
+  logger.info('Applying migrations…')
   await migrate(db, { migrationsFolder: './drizzle' })
-  console.log('Migrations are up to date.')
+  logger.info('Migrations are up to date.')
 
   await pool.end()
 }
 
 main().catch((err) => {
-  console.error('Migration failed:', err)
+  logger.error('Migration failed', { error: err instanceof Error ? err.message : String(err) })
   process.exit(1)
 })

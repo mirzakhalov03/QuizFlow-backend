@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 
 import { gradeOpenEndedAnswers } from './open-ended-grading.service'
+import { logger } from '../config/logger'
 import { db } from '../database/database'
 import { questionOptions, questions, quizResults, quizzes, userAnswers } from '../database/schema'
 import { AppError } from '../helpers/AppError'
@@ -203,7 +204,9 @@ export const submitQuiz = async (
   // its setup queries) so a detached rejection can't crash the process.
   if (gradingStatus === 'pending') {
     gradeOpenEndedAnswers(quizId, userId).catch((err) =>
-      console.error('[openEndedGrading] unhandled rejection:', err),
+      logger.error('Open-ended grading unhandled rejection', {
+        error: err instanceof Error ? err.message : String(err),
+      }),
     )
   }
 
