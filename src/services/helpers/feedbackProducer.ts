@@ -1,4 +1,4 @@
-import { getRabbitMQChannel, FEEDBACK_QUEUE } from './rabbitmq'
+import { getRabbitMQChannel, FEEDBACK_QUEUE } from '../clients/rabbitmq.client'
 
 export const publishFeedbackJob = async (userId: string): Promise<void> => {
   const channel = await getRabbitMQChannel()

@@ -5,8 +5,8 @@ import type { Request, Response, NextFunction } from 'express'
 import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 import { ALLOWED_MIME_TYPES, buildS3Key, getUploadedFiles } from '../helpers/utils/uploadUtils'
-import { createPresignedUploadUrl } from '../services/presignedUrl'
-import { uploadFile } from '../services/uploadFile'
+import { createPresignedUploadUrl } from '../services/helpers/presignedUrl'
+import { uploadFile } from '../services/helpers/uploadFile'
 
 /**
  * POST /upload-file  (legacy — kept for backward compatibility)

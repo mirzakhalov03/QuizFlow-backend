@@ -5,7 +5,7 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
-
+const DifficultyTypeEnum = z.enum(DIFFICULTY_TYPES)
 export const GenerateQuizSourceSchema = z.object({
   source: z.enum(['file', 'notion']).default('file'),
 })
@@ -57,7 +57,9 @@ export const GenerateQuizSchema = z
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
-    difficulty: DifficultyEnum.optional(),
+    difficulty: DifficultyTypeEnum.optional(),
+
+    apiKeyId: z.uuid().optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)

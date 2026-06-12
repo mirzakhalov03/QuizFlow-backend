@@ -4,10 +4,10 @@ import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
-import { invokeQuizGenerator } from '../services/invokeQuizGenerator'
-import notionQuizService from '../services/notionQuizService'
-import profileService from '../services/profileService'
-import { generateQuizPdf } from '../services/quizPdf.service'
+import { invokeQuizGenerator } from '../services/helpers/invokeQuizGenerator'
+import notionQuizService from '../services/notion-quiz.service'
+import profileService from '../services/profile.service'
+import { getQuizResult, submitQuiz } from '../services/quiz-submission.service'
 import { getPublicQuizByToken } from '../services/quiz.service'
 import { setQuizSharing } from '../services/quiz.service'
 import {
@@ -15,9 +15,9 @@ import {
   getJobById,
   getQuizById,
   getQuizzes,
-  submitQuiz,
   updateQuizById,
 } from '../services/quiz.service'
+import { generateQuizPdf } from '../services/quizPdf.service'
 import type {
   GenerateQuizInput,
   GetQuizzesQuery,
@@ -44,8 +44,8 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       questionCount,
       model,
       difficulty,
+      apiKeyId,
     } = req.body as GenerateQuizInput
-
     if (source === 'notion') {
       if (!pageIds || pageIds.length === 0) {
         throw new AppError('pageIds is required for source=notion', 400, 'VALIDATION_ERROR')
@@ -109,6 +109,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       model,
       userBio,
       difficulty,
+      apiKeyId,
     })
 
     return res.status(202).json(
@@ -284,6 +285,28 @@ export const submitQuizController = async (req: Request, res: Response, next: Ne
     next(error)
   }
 }
+
+export const getQuizResultController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getAuthUserId(req)
+
+    const rawId = req.params.id
+    const quizId = typeof rawId === 'string' ? rawId : rawId?.[0]
+    if (!quizId) {
+      throw new AppError('Invalid quiz id', 400, 'VALIDATION_ERROR')
+    }
+
+    const data = await getQuizResult(quizId, userId)
+    if (!data) {
+      throw new AppError('Result not found', 404, 'NOT_FOUND')
+    }
+
+    res.status(200).json(successResponse('Quiz result retrieved', data))
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const enableSharingController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getAuthUserId(req)

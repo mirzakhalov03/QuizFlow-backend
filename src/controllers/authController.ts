@@ -4,7 +4,7 @@ import { successResponse } from '../helpers/apiResponse'
 import { buildGoogleAuthUrl } from '../helpers/utils/buildGoogleAuthUrl'
 import { buildNotionAuthUrl } from '../helpers/utils/buildNotionAuthUrl'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import authService from '../services/authService'
+import authService from '../services/auth.service'
 
 const logoutUser = (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -43,9 +43,8 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7d — matches JWT expiry
     })
 
-    return res.redirect(
-      process.env.FRONTEND_URL + '/app/dashboard' || 'http://localhost:5173/app/dashboard',
-    )
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
+    return res.redirect(`${frontendUrl}/app/analytics`)
   } catch (error) {
     next(error)
   }

@@ -2,9 +2,9 @@ import { randomUUID } from 'crypto'
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 
-import { invokeQuizGenerator } from './invokeQuizGenerator'
-import notionService from './notionService'
-import { s3Client, s3BucketName } from './s3Client'
+import { s3Client, s3BucketName } from './clients/s3.client'
+import { invokeQuizGenerator } from './helpers/invokeQuizGenerator'
+import notionService from './notion.service'
 import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
 
@@ -17,6 +17,7 @@ type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  apiKeyId?: string
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -72,6 +73,7 @@ class NotionQuizService {
         timerDuration: input.timerDuration,
         type: input.type,
         questionCount: input.questionCount,
+        apiKeyId: input.apiKeyId,
       })
 
       return {

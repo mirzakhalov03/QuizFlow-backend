@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 
-import { AppError } from '../helpers/AppError'
+import { logger } from '../../config/logger'
+import { AppError } from '../../helpers/AppError'
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -64,7 +65,11 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
     })
   } catch (err) {
     if (err instanceof OpenAI.APIError) {
-      console.error('[openRouter] error:', err.status, err.message, err.error)
+      logger.error('OpenRouter API error', {
+        status: err.status,
+        message: err.message,
+        error: err.error,
+      })
       throw new AppError(
         `OpenRouter request failed (${err.status})`,
         502,
