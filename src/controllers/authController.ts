@@ -57,10 +57,13 @@ const redirectToNotion = (req: Request, res: Response) => {
 const notionCallback = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const code = req.query.code as string
+    const error = req.query.error as string
     const user = req.user
 
-    if (!code) {
-      return res.status(400).json({ message: 'No code provided' })
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
+
+    if (error || !code) {
+      return res.redirect(`${frontendUrl}/integrations/failure?error=access_denied`)
     }
 
     if (!user) {
@@ -69,9 +72,7 @@ const notionCallback = async (req: AuthRequest, res: Response, next: NextFunctio
 
     await authService.handleNotionOAuth(user.id, code)
 
-    return res.redirect(
-      `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/integrations/success`,
-    )
+    return res.redirect(`${frontendUrl}/integrations/success`)
   } catch (error) {
     next(error)
   }
