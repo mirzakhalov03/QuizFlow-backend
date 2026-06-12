@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 
+import { logger } from '../config/logger'
 import { getEligibleUserIds } from '../services/feedback.service'
 import { publishFeedbackJob } from '../services/helpers/feedbackProducer'
 
@@ -8,27 +9,30 @@ const CRON_SCHEDULE = '0 2 * * *'
 
 export const startFeedbackCron = (): void => {
   cron.schedule(CRON_SCHEDULE, async () => {
-    console.log('[feedbackCron] Starting feedback job...')
+    logger.info('feedbackCron starting', { job: 'feedbackCron' })
 
     try {
       const userIds = await getEligibleUserIds()
 
       if (userIds.length === 0) {
-        console.log('[feedbackCron] No eligible users found')
+        logger.info('feedbackCron: no eligible users', { job: 'feedbackCron' })
         return
       }
 
-      console.log(`[feedbackCron] Publishing ${userIds.length} feedback jobs`)
+      logger.info('feedbackCron publishing jobs', { job: 'feedbackCron', count: userIds.length })
 
       for (const userId of userIds) {
         await publishFeedbackJob(userId)
       }
 
-      console.log('[feedbackCron] Done')
+      logger.info('feedbackCron done', { job: 'feedbackCron' })
     } catch (error) {
-      console.error('[feedbackCron] Failed:', error)
+      logger.error('feedbackCron failed', {
+        job: 'feedbackCron',
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   })
 
-  console.log('[feedbackCron] Scheduled — runs nightly at 2am')
+  logger.info('feedbackCron scheduled (nightly 2am)', { job: 'feedbackCron' })
 }

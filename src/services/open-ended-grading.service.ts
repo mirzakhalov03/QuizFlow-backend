@@ -1,6 +1,7 @@
 import { and, count, eq } from 'drizzle-orm'
 
 import { chatJSON } from './clients/openrouter.client'
+import { logger } from '../config/logger'
 import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
 import { questionOptions, questions, quizResults, userAnswers } from '../database/schema'
@@ -159,7 +160,9 @@ export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Pro
       await finalizeScore(tx, quizId, userId)
     })
   } catch (err) {
-    console.error('[openEndedGrading] failed:', err)
+    logger.error('Open-ended grading failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
     // Degrade gracefully: drop open-ended from the denominator and leave their
     // verdicts null (the UI shows them as ungraded). correctAnswers keeps the
     // auto-gradable count already persisted at submit.

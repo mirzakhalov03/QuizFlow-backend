@@ -14,6 +14,7 @@ import {
   submitQuizController,
 } from '../controllers/quizController'
 import { authMiddleware } from '../middlewares/authMiddleware'
+import { quizGenerationLimiter } from '../middlewares/rateLimit'
 import { validate, validateQuery } from '../middlewares/validate'
 import {
   GenerateQuizSchema,
@@ -55,6 +56,7 @@ const router = Router()
 router.post(
   '/quizzes',
   authMiddleware,
+  quizGenerationLimiter,
   validateQuery(GenerateQuizSourceSchema),
   validate(GenerateQuizSchema),
   generateQuizController,
