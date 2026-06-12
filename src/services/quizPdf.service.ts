@@ -17,7 +17,7 @@ type PdfQuestion = {
 
 type PdfQuiz = {
   title: string
-  difficulty: string | null
+  difficulty?: string | null
   questions: PdfQuestion[]
 }
 
