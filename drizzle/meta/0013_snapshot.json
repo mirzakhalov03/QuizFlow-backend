@@ -1,6 +1,6 @@
 {
-  "id": "c7d9954b-c849-4857-aa64-ec53692072c4",
-  "prevId": "a3536781-4134-4b04-8b20-49f4e6e396fd",
+  "id": "cce83621-4ee0-4f3e-8caa-54260b819fe6",
+  "prevId": "c7d9954b-c849-4857-aa64-ec53692072c4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -42,7 +42,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "folders_user_id_idx": {
+          "name": "folders_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "folders_user_id_users_id_fk": {
           "name": "folders_user_id_users_id_fk",

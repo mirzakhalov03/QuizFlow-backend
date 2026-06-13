@@ -1,11 +1,9 @@
 import { Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
-import { AppError } from '../helpers/AppError'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import notionQuizService, { type GenerateQuizFromNotionInput } from '../services/notionQuizService'
 import notionService from '../services/notionService'
-import type { QuestionType } from '../types/questionTypes'
 
 export const getNotionPages = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -32,7 +30,7 @@ export const generateQuizFromNotion = async (
     const userId = req.user!.id
 
     const {
-      pageId,
+      pageIds,
       title,
       userInstructions,
       isTimerEnabled,
@@ -40,28 +38,15 @@ export const generateQuizFromNotion = async (
       type,
       questionCount,
       folderId,
-    } = req.body as {
-      pageId: string
-      title?: string
-      userInstructions?: string
-      isTimerEnabled?: boolean
-      timerDuration?: number
-      type?: QuestionType
-      questionCount?: number
-      folderId?: string
-    }
-
-    if (!pageId) {
-      throw new AppError('pageId is required', 400, 'VALIDATION_ERROR')
-    }
+    } = req.body as GenerateQuizFromNotionInput
 
     const payload: GenerateQuizFromNotionInput = {
       userId,
-      pageIds: [pageId],
+      pageIds,
       title,
       userInstructions,
       isTimerEnabled: Boolean(isTimerEnabled),
-      timerDuration: timerDuration ?? undefined,
+      timerDuration,
       type,
       questionCount,
       folderId,

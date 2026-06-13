@@ -32,22 +32,24 @@ export const getFolderById = async (userId: string, folderId: string) => {
 }
 
 export const createFolder = async (userId: string, name: string, quizIds?: string[]) => {
-  const [folder] = await db
-    .insert(folders)
-    .values({
-      userId,
-      name,
-    })
-    .returning()
+  return db.transaction(async (tx) => {
+    const [folder] = await tx
+      .insert(folders)
+      .values({
+        userId,
+        name,
+      })
+      .returning()
 
-  if (quizIds && quizIds.length > 0) {
-    await db
-      .update(quizzes)
-      .set({ folderId: folder.id, updatedAt: new Date() })
-      .where(and(eq(quizzes.userId, userId), inArray(quizzes.id, quizIds)))
-  }
+    if (quizIds && quizIds.length > 0) {
+      await tx
+        .update(quizzes)
+        .set({ folderId: folder.id, updatedAt: new Date() })
+        .where(and(eq(quizzes.userId, userId), inArray(quizzes.id, quizIds)))
+    }
 
-  return folder
+    return folder
+  })
 }
 
 export const updateFolder = async (userId: string, folderId: string, name: string) => {

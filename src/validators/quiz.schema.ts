@@ -154,7 +154,9 @@ export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
 
 export const GenerateQuizFromNotionSchema = z
   .object({
-    pageId: z.string().min(1, 'pageId is required'),
+    pageIds: z
+      .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
+      .transform((val) => (Array.isArray(val) ? val : [val])),
 
     title: z.string().min(1).max(200).optional(),
 

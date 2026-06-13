@@ -92,18 +92,24 @@ export const userApiKeys = pgTable('user_api_keys', {
 
 export const questionTypeEnum = pgEnum('question_type', QUESTION_TYPES)
 
-export const folders = pgTable('folders', {
-  id: uuid('id').primaryKey().defaultRandom().notNull(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { mode: 'date' })
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date()),
-})
+export const folders = pgTable(
+  'folders',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('folders_user_id_idx').on(table.userId),
+  }),
+)
 
 export const quizzes = pgTable('quizzes', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),
