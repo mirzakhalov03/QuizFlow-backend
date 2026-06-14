@@ -168,7 +168,6 @@ export const SubmitQuizSchema = z.object({
           }
         }),
     )
-    .min(1, 'At least one answer is required')
     .max(100, 'Too many answers submitted')
     .superRefine((answers, ctx) => {
       const seen = new Set<string>()

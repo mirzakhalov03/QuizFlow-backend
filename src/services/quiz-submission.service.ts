@@ -50,6 +50,22 @@ const scoreAnswers = (
   }
 
   const correctnessByQuestion = new Map<string, boolean>()
+
+  // All auto-gradable questions are incorrect unless a correct option is chosen.
+  for (const qId of autoGradableIds) {
+    correctnessByQuestion.set(qId, false)
+  }
+
+  // Open-ended questions are incorrect if not answered. If they ARE answered,
+  // they stay out of this map (staying null/pending) until graded.
+  const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
+  for (const qId of openEndedIds) {
+    const answer = answersByQuestion.get(qId)
+    if (!answer || !answer.textAnswer || answer.textAnswer.trim().length === 0) {
+      correctnessByQuestion.set(qId, false)
+    }
+  }
+
   let correctAnswers = 0
 
   for (const answer of answers) {
@@ -91,13 +107,17 @@ export const submitQuiz = async (
   userId: string,
   rawAnswers: SubmitAnswerInput[],
 ) => {
+  logger.info('Submitting quiz', { quizId, userId, answerCount: rawAnswers.length })
   const [quiz] = await db
     .select({ id: quizzes.id })
     .from(quizzes)
     .where(and(eq(quizzes.id, quizId), eq(quizzes.userId, userId)))
     .limit(1)
 
-  if (!quiz) return null
+  if (!quiz) {
+    logger.warn('Quiz not found for submission', { quizId, userId })
+    return null
+  }
 
   // Keep only the first answer per question. A client could send duplicates,
   // and (userId, questionId) is unique — duplicates would break the insert below.
@@ -153,18 +173,22 @@ export const submitQuiz = async (
     scoreAnswers(quizQuestions, answers, optionsById)
 
   const quizQuestionIds = quizQuestions.map((q) => q.id)
+  const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
 
   const result = await db.transaction(async (tx) => {
-    const answerValues = answers.map((answer) => ({
-      userId,
-      questionId: answer.questionId,
-      selectedOptionId: answer.selectedOptionId ?? null,
-      textAnswer: answer.textAnswer ?? null,
-      isCorrect: correctnessByQuestion.has(answer.questionId)
-        ? correctnessByQuestion.get(answer.questionId)!
-        : null,
-      updatedAt: new Date(),
-    }))
+    // Record a result for every question in the quiz, ensuring that unanswered
+    // questions are explicitly marked as incorrect.
+    const answerValues = quizQuestions.map((q) => {
+      const answer = answersByQuestion.get(q.id)
+      return {
+        userId,
+        questionId: q.id,
+        selectedOptionId: answer?.selectedOptionId ?? null,
+        textAnswer: answer?.textAnswer ?? null,
+        isCorrect: correctnessByQuestion.has(q.id) ? correctnessByQuestion.get(q.id)! : null,
+        updatedAt: new Date(),
+      }
+    })
 
     // This submission is the authoritative attempt: replace any prior answers
     // for this quiz so questions left unanswered now don't keep stale answers
@@ -198,6 +222,8 @@ export const submitQuiz = async (
     return resultRow
   })
 
+  logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
+
   // Fire-and-forget: grade open-ended answers in the background so submit stays
   // instant. The grader sets gradingStatus='failed' on handled errors; the
   // .catch here is the safety net for anything that escapes (e.g. a DB blip in
@@ -214,6 +240,7 @@ export const submitQuiz = async (
 }
 
 export const getQuizResult = async (quizId: string, userId: string) => {
+  logger.info('Fetching quiz result', { quizId, userId })
   const [result] = await db
     .select({
       id: quizResults.id,
@@ -228,7 +255,10 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
     .limit(1)
 
-  if (!result) return null
+  if (!result) {
+    logger.warn('Quiz result not found', { quizId, userId })
+    return null
+  }
 
   // One pass over the user's stored answers yields both the per-answer verdicts
   // (graded open-ended) and the raw answers used to rebuild the review on refresh.
