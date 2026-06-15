@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, sql, or, isNull, ne } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
@@ -14,6 +14,8 @@ type GetQuizzesParams = {
   types?: QuestionType[]
   /** Sort by creation date: newest first (default) or oldest first */
   sort?: 'newest' | 'oldest'
+  /** Exclude quizzes that belong to this folder ID */
+  excludeFolderId?: string
 }
 
 type UpdateQuizInput = {
@@ -35,10 +37,13 @@ export const getQuizzes = async ({
   search,
   types,
   sort = 'newest',
+  excludeFolderId,
 }: GetQuizzesParams) => {
   const conditions = [eq(quizzes.userId, userId)]
   if (search) conditions.push(ilike(quizzes.title, `%${search}%`))
   if (types && types.length > 0) conditions.push(inArray(quizzes.type, types))
+  if (excludeFolderId)
+    conditions.push(or(ne(quizzes.folderId, excludeFolderId), isNull(quizzes.folderId))!)
 
   const orderBy = sort === 'oldest' ? asc(quizzes.createdAt) : desc(quizzes.createdAt)
 

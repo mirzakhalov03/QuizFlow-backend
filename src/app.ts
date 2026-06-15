@@ -14,6 +14,7 @@ import { requestLogger } from './middlewares/requestLogger'
 import analyticsRoutes from './routes/analytics.routes'
 import authRoutes from './routes/auth.routes'
 import byokRoutes from './routes/byok.routes'
+import folderRoutes from './routes/folder.routes'
 import healthRoutes from './routes/health.routes'
 import integrationRoutes from './routes/integrations.routes'
 import quizRoutes from './routes/quiz.routes'
@@ -46,6 +47,7 @@ app.use(integrationRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
+app.use(folderRoutes)
 app.use(byokRoutes)
 app.use(analyticsRoutes)
 

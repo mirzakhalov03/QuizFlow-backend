@@ -7,7 +7,8 @@ import { AppError } from '../../helpers/AppError'
 import type { DifficultyType } from '../../types/difficultyTypes'
 import type { QuestionType } from '../../types/questionTypes'
 import { lambdaClient } from '../clients/lambda.client'
-type QuizGeneratePayload = {
+
+export type QuizGeneratePayload = {
   userId: string
   bucket: string
   keys: string[]
@@ -20,6 +21,7 @@ type QuizGeneratePayload = {
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
+  folderId?: string
   apiKeyId?: string
 }
 

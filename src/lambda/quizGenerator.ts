@@ -35,6 +35,7 @@ type LambdaEvent = {
   quiz?: AiQuiz
   userBio?: string | null
   difficulty?: DifficultyType
+  folderId?: string
   apiKeyId?: string
 }
 
@@ -56,6 +57,7 @@ const persistQuiz = async (
       .values({
         title: payload.title || event.title || 'Untitled quiz',
         userId: event.userId,
+        folderId: event.folderId,
         type: event.type ? normalizeQuestionType(event.type) : undefined,
         properties: {
           source,

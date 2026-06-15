@@ -93,12 +93,32 @@ export const userApiKeys = pgTable('user_api_keys', {
 
 export const questionTypeEnum = pgEnum('question_type', QUESTION_TYPES)
 
+export const folders = pgTable(
+  'folders',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('folders_user_id_idx').on(table.userId),
+  }),
+)
+
 export const quizzes = pgTable('quizzes', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),
   title: text('title').notNull(),
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  folderId: uuid('folder_id').references(() => folders.id, { onDelete: 'set null' }),
   type: questionTypeEnum('type'),
   isPublic: boolean('is_public').notNull().default(false),
   shareToken: text('share_token')
@@ -240,9 +260,18 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   integrations: many(userIntegrations),
   apiKeys: many(userApiKeys),
   quizzes: many(quizzes),
+  folders: many(folders),
   answers: many(userAnswers),
   quizResults: many(quizResults),
   quizJobs: many(quizJobs),
+}))
+
+export const foldersRelations = relations(folders, ({ one, many }) => ({
+  user: one(users, {
+    fields: [folders.userId],
+    references: [users.id],
+  }),
+  quizzes: many(quizzes),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -270,6 +299,10 @@ export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
   user: one(users, {
     fields: [quizzes.userId],
     references: [users.id],
+  }),
+  folder: one(folders, {
+    fields: [quizzes.folderId],
+    references: [folders.id],
   }),
   questions: many(questions),
   quizResults: many(quizResults),

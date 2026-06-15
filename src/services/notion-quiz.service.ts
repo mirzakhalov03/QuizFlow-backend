@@ -9,7 +9,7 @@ import { AppError } from '../helpers/AppError'
 import { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
 
-type GenerateQuizFromNotionInput = {
+export type GenerateQuizFromNotionInput = {
   userId: string
   pageIds: string[]
   title?: string
@@ -18,6 +18,7 @@ type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  folderId?: string
   apiKeyId?: string
   model?: string
   difficulty?: DifficultyType
@@ -76,6 +77,7 @@ class NotionQuizService {
         timerDuration: input.timerDuration,
         type: input.type,
         questionCount: input.questionCount,
+        folderId: input.folderId,
         apiKeyId: input.apiKeyId,
         difficulty: input.difficulty,
         model: input.model,

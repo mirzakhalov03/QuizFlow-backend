@@ -44,6 +44,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       questionCount,
       model,
       difficulty,
+      folderId,
       apiKeyId,
     } = req.body as GenerateQuizInput
     if (source === 'notion') {
@@ -60,6 +61,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         type,
         questionCount,
         isTimerEnabled: Boolean(isTimerEnabled),
+        folderId,
         apiKeyId,
         model,
         difficulty,
@@ -100,18 +102,19 @@ export const generateQuizController = async (req: Request, res: Response, next: 
 
     const userBio = await profileService.getProfileBio(userId)
     const jobId = await invokeQuizGenerator({
-      bucket: resolvedBucket,
-      keys: resolvedKeys,
+      bucket: resolvedBucket!,
+      keys: resolvedKeys!,
       userId,
       title,
       userInstructions,
       isTimerEnabled: Boolean(isTimerEnabled),
-      timerDuration,
+      timerDuration: timerDuration ?? undefined,
       type,
       questionCount,
       model,
       userBio,
       difficulty,
+      folderId,
       apiKeyId,
     })
 
@@ -151,9 +154,18 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const { limit, offset, search, types, sort } = req.query as unknown as GetQuizzesQuery
+    const { limit, offset, search, types, sort, excludeFolderId } =
+      req.query as unknown as GetQuizzesQuery
 
-    const { items, total } = await getQuizzes({ userId, limit, offset, search, types, sort })
+    const { items, total } = await getQuizzes({
+      userId,
+      limit,
+      offset,
+      search,
+      types,
+      sort,
+      excludeFolderId,
+    })
 
     res.status(200).json(
       successResponse('Quizzes retrieved successfully', {
