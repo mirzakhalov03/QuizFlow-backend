@@ -34,7 +34,7 @@ type LambdaEvent = {
   model?: string
   quiz?: AiQuiz
   userBio?: string | null
-  quizDifficulty?: DifficultyType
+  difficulty?: DifficultyType
   apiKeyId?: string
 }
 
@@ -66,7 +66,7 @@ const persistQuiz = async (
         userInstructions: event.userInstructions ?? null,
         tokenUsage: usage,
         uploadedAt: new Date(),
-        difficulty: event.quizDifficulty,
+        difficulty: event.difficulty,
       })
       .returning({ id: quizzes.id })
 
@@ -145,7 +145,7 @@ export const handler = async (event: LambdaEvent) => {
           userBio: event.userBio,
           defaultTitle: event.title,
           model: event.model,
-          difficulty: event.quizDifficulty,
+          difficulty: event.difficulty,
           apiKey,
         })
 

@@ -59,6 +59,9 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         type,
         questionCount,
         isTimerEnabled: Boolean(isTimerEnabled),
+        apiKeyId,
+        model,
+        difficulty,
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))

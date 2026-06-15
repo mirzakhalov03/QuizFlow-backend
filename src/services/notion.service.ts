@@ -56,18 +56,14 @@ class NotionService {
     })
 
     return searchResults.results
-      .filter(
-        (result): result is PageObjectResponse =>
-          'properties' in result &&
-          'parent' in result &&
-          (result as { parent: { type: string } }).parent.type === 'workspace',
-      )
+      .filter((result): result is PageObjectResponse => 'properties' in result)
       .map((page) => {
-        const titleProp = page.properties['title']
-        const title =
-          titleProp?.type === 'title' && titleProp.title[0]?.plain_text
-            ? titleProp.title[0].plain_text
-            : 'Untitled'
+        // Find the property of type 'title' (Notion pages always have exactly one)
+        const titleProp = Object.values(page.properties).find((prop) => prop.type === 'title') as
+          | Extract<PageObjectResponse['properties'][string], { type: 'title' }>
+          | undefined
+
+        const title = titleProp?.title?.[0]?.plain_text || 'Untitled'
 
         return {
           id: page.id,
@@ -158,6 +154,13 @@ class NotionService {
           }
         } catch {
           // silently skip unreadable databases
+        }
+      } else if (block.type === 'child_page') {
+        this.push(content, state, '## ' + (block.child_page.title || 'Untitled Subpage'))
+        try {
+          await this.fetchBlocksContent(notion, block.id, content, state, depth + 1)
+        } catch {
+          // silently skip unreadable subpages
         }
       } else if (block.type === 'table') {
         const tableRows = await notion.blocks.children.list({ block_id: block.id, page_size: 100 })
