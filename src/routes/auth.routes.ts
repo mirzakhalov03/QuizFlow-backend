@@ -41,14 +41,14 @@ router.post(
 router.post('/auth/login', otpVerifyLimiter, validate(AuthLoginSchema), authEmailController.login)
 router.post(
   '/auth/password-reset',
-  authLimiter,
   validate(PasswordResetRequestSchema),
+  authLimiter,
   authEmailController.requestPasswordReset,
 )
 router.post(
   '/auth/password-reset/confirm',
-  otpVerifyLimiter,
   validate(PasswordResetConfirmSchema),
+  otpVerifyLimiter,
   authEmailController.resetPassword,
 )
 router.post(
