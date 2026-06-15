@@ -15,11 +15,21 @@ export type TypeBreakdown = {
   averageScore: number
 }
 
+export type QuizHistoryItem = {
+  quizId: string
+  quizTitle: string
+  correctAnswers: number
+  totalQuestions: number
+  score: number
+  date: string
+}
+
 export type AnalyticsSummary = {
   totalQuizzesTaken: number
   averageScore: number
   scoreOverTime: ScorePoint[]
   breakdownByType: TypeBreakdown[]
+  history: QuizHistoryItem[]
   totalTokensUsed: number
 }
 
@@ -30,6 +40,8 @@ const round = (n: number) => Math.round(n * 100) / 100
 export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
   const quizRows = await db
     .select({
+      quizId: quizResults.quizId,
+      quizTitle: quizzes.title,
       createdAt: quizResults.createdAt,
       totalQuestions: quizResults.totalQuestions,
       correctAnswers: quizResults.correctAnswers,
@@ -60,6 +72,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       averageScore: 0,
       scoreOverTime: [],
       breakdownByType: [],
+      history: [],
       totalTokensUsed,
     }
   }
@@ -68,6 +81,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   let gradedCount = 0
   const byDay = new Map<string, { sum: number; count: number }>()
   const byType = new Map<QuestionType, { sum: number; count: number }>()
+  const history: QuizHistoryItem[] = []
 
   for (const r of quizRows) {
     if (r.totalQuestions <= 0) continue
@@ -75,6 +89,15 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     const percent = toPercent(r.correctAnswers, r.totalQuestions)
     gradedScoreSum += percent
     gradedCount += 1
+
+    history.push({
+      quizId: r.quizId,
+      quizTitle: r.quizTitle,
+      correctAnswers: r.correctAnswers,
+      totalQuestions: r.totalQuestions,
+      score: round(percent),
+      date: r.createdAt.toISOString(),
+    })
 
     const date = r.createdAt.toISOString().slice(0, 10)
     const dayEntry = byDay.get(date) ?? { sum: 0, count: 0 }
@@ -104,11 +127,14 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }),
   )
 
+  history.sort((a, b) => b.date.localeCompare(a.date))
+
   return {
     totalQuizzesTaken: gradedCount,
     averageScore: round(averageScore),
     scoreOverTime,
     breakdownByType,
+    history,
     totalTokensUsed,
   }
 }
