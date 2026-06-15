@@ -56,6 +56,10 @@ class AuthService {
     await db.update(users).set({ refreshToken: token }).where(eq(users.id, userId))
   }
 
+  async clearRefreshToken(token: string) {
+    await db.update(users).set({ refreshToken: null }).where(eq(users.refreshToken, token))
+  }
+
   private async exchangeGoogleCode(code: string) {
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',

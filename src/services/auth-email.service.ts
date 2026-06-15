@@ -130,6 +130,27 @@ class AuthEmailService {
     await userService.updateUser(userId, { password: passwordHash })
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await User.findById(userId)
+
+    if (!user) {
+      throw new AppError('User not found', 404)
+    }
+
+    if (!user.password) {
+      throw new AppError('No password set. Use set-password instead.', 400, 'NO_PASSWORD')
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password)
+
+    if (!isValid) {
+      throw new AppError('Current password is incorrect', 400, 'INVALID_CURRENT_PASSWORD')
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await userService.updateUser(userId, { password: passwordHash })
+  }
+
   async resetPassword(email: string, token: string, password: string) {
     const user = await userService.findByEmail(email)
 
