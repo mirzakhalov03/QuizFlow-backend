@@ -52,7 +52,11 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
       return res.status(400).json({ message: 'Invalid OAuth state' })
     }
 
-    res.clearCookie('oauth_state')
+    res.clearCookie('oauth_state', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
 
     const { accessToken, refreshToken } = await authService.handleGoogleOAuth(code)
 
