@@ -127,7 +127,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }),
   )
 
-  history.sort((a, b) => b.date.localeCompare(a.date))
+  history.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
   return {
     totalQuizzesTaken: gradedCount,
