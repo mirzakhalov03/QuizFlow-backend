@@ -42,7 +42,7 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
   try {
     const code = req.query.code as string
     const state = req.query.state as string
-    const storedState = req.cookies.oauth_state
+    const storedState = req.cookies?.oauth_state
 
     if (!code) {
       return res.status(400).json({ message: 'No code provided' })
