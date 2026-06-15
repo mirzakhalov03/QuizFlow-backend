@@ -154,6 +154,7 @@ export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
 
 export const GenerateQuizFromNotionSchema = z
   .object({
+    userId: z.uuid(),
     pageIds: z
       .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
       .transform((val) => (Array.isArray(val) ? val : [val])),
@@ -174,7 +175,7 @@ export const GenerateQuizFromNotionSchema = z
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
 
-    folderId: z.string().uuid().optional(),
+    folderId: z.uuid().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.isTimerEnabled && !data.timerDuration) {
