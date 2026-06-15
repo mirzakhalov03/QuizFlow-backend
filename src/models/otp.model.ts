@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 import { eq } from 'drizzle-orm'
 
 import { db } from '../database/database'
@@ -22,7 +24,7 @@ export default class Otp {
   }
 
   static generateCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString()
+    return crypto.randomInt(100000, 1000000).toString()
   }
 
   static async upsert(key: string, code: string, ttlMs: number = OTP_EXPIRATION_MS): Promise<void> {

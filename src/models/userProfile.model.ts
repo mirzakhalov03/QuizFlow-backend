@@ -36,29 +36,6 @@ export default class userProfile {
     this.updatedAt = updatedAt
   }
 
-  static async createUserProfile(userProfileData: {
-    userId: string
-    bio: string | null
-    profilePicture: string | null
-    isOnboarded?: boolean
-    createdAt?: Date
-    updatedAt?: Date
-  }): Promise<userProfile> {
-    const [newUserProfile] = await db.insert(userProfiles).values(userProfileData).returning()
-
-    return new userProfile(
-      newUserProfile.id,
-      newUserProfile.userId,
-      newUserProfile.bio,
-      newUserProfile.profilePicture,
-      newUserProfile.isOnboarded,
-      newUserProfile.aiFeedback,
-      newUserProfile.aiFeedbackGeneratedAt,
-      newUserProfile.createdAt,
-      newUserProfile.updatedAt,
-    )
-  }
-
   static async create(userId: string, bio: string | null, profilePicture: string | null) {
     const [row] = await db.insert(userProfiles).values({ userId, bio, profilePicture }).returning()
 
@@ -73,6 +50,36 @@ export default class userProfile {
       row.createdAt,
       row.updatedAt,
     )
+  }
+
+  static async findOrCreate(
+    userId: string,
+    bio: string | null = null,
+    profilePicture: string | null = null,
+  ): Promise<userProfile> {
+    const [row] = await db
+      .insert(userProfiles)
+      .values({ userId, bio, profilePicture })
+      .onConflictDoNothing({ target: userProfiles.userId })
+      .returning()
+
+    if (row) {
+      return new userProfile(
+        row.id,
+        row.userId,
+        row.bio,
+        row.profilePicture,
+        row.isOnboarded,
+        row.aiFeedback,
+        row.aiFeedbackGeneratedAt,
+        row.createdAt,
+        row.updatedAt,
+      )
+    }
+
+    // Row already existed (conflict) — return the existing one.
+    const existing = await this.findByUserId(userId)
+    return existing as userProfile
   }
 
   static async findByUserId(userId: string): Promise<userProfile | null> {

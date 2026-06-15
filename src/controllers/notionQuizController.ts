@@ -2,7 +2,9 @@ import { Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import notionQuizService from '../services/notion-quiz.service'
+import notionQuizService, {
+  GenerateQuizFromNotionInput as NotionQuizServiceInput,
+} from '../services/notion-quiz.service'
 import notionService from '../services/notion.service'
 import { GenerateQuizFromNotionInput } from '../validators/quiz.schema'
 export const getNotionPages = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -40,7 +42,7 @@ export const generateQuizFromNotion = async (
       folderId,
     } = req.body as GenerateQuizFromNotionInput
 
-    const payload: GenerateQuizFromNotionInput = {
+    const payload: NotionQuizServiceInput = {
       userId,
       pageIds,
       title,

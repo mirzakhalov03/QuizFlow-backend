@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 
 import authService from './auth.service'
 import emailService from './clients/email.client'
+import profileService from './profile.service'
 import userService from './user.service'
 import { logger } from '../config/logger'
 import { db } from '../database/database'
@@ -70,6 +71,9 @@ class AuthEmailService {
 
     await User.updateUser(user.id, { isVerified: true })
     await Otp.delete(`register:${email}`)
+    // Provision the profile here (mirrors the Google OAuth path) so every verified
+    // user always has one — keeps GET /userProfile/me a pure read.
+    await profileService.ensureProfile(user.id)
     await this.sendWelcomeEmail(user.email, user.fullName)
 
     return await this.generateTokens(user)
@@ -127,6 +131,27 @@ class AuthEmailService {
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
+    await userService.updateUser(userId, { password: passwordHash })
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await User.findById(userId)
+
+    if (!user) {
+      throw new AppError('User not found', 404)
+    }
+
+    if (!user.password) {
+      throw new AppError('No password set. Use set-password instead.', 400, 'NO_PASSWORD')
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password)
+
+    if (!isValid) {
+      throw new AppError('Current password is incorrect', 400, 'INVALID_CURRENT_PASSWORD')
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10)
     await userService.updateUser(userId, { password: passwordHash })
   }
 
