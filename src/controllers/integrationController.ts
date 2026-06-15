@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express'
 
 import { AuthRequest } from '../middlewares/authMiddleware'
-import integrationService from '../services/integrationService'
+import integrationService from '../services/integration.service'
 
 export const getIntegrations = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

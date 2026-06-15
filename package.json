@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node ./src/server.ts\"",
     "build": "tsc",
-    "build:lambda": "node ./scripts/build-lambda.js",
+    "build:lambda": "ts-node ./scripts/build-lambda.ts",
+    "deploy:lambda": "ts-node ./scripts/deploy-lambda.ts",
     "start": "node ./dist/src/server.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "ts-node ./src/database/migrate.ts",
@@ -39,6 +40,7 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "~4.16.1",
+    "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.12.0",
@@ -49,8 +51,10 @@
     "openai": "^6.38.0",
     "pdf2json": "^4.0.3",
     "pg": "^8.20.0",
+    "puppeteer": "^24.10.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "winston": "^3.19.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

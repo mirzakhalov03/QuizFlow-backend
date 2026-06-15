@@ -2,9 +2,9 @@ import { Response, NextFunction } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import notionQuizService, { type GenerateQuizFromNotionInput } from '../services/notionQuizService'
-import notionService from '../services/notionService'
-
+import notionQuizService from '../services/notion-quiz.service'
+import notionService from '../services/notion.service'
+import { GenerateQuizFromNotionInput } from '../validators/quiz.schema'
 export const getNotionPages = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id

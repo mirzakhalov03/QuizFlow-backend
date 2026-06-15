@@ -12,8 +12,9 @@ import {
   QUIZ_FILE_MAX_BYTES,
   streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
-import { generateQuizFromText } from '../services/quizAi'
-import type { AiQuiz, AiQuizResult } from '../services/quizAi'
+import { getByokById } from '../services/byok.service'
+import { generateQuizFromText } from '../services/helpers/quizAi'
+import type { AiQuiz, AiQuizResult } from '../services/helpers/quizAi'
 import type { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
 // Lambda-local clients — no Express app dependencies, no credential env vars required
@@ -33,8 +34,9 @@ type LambdaEvent = {
   model?: string
   quiz?: AiQuiz
   userBio?: string | null
-  quizDifficulty?: DifficultyType
+  difficulty?: DifficultyType
   folderId?: string
+  apiKeyId?: string
 }
 
 const persistQuiz = async (
@@ -66,7 +68,7 @@ const persistQuiz = async (
         userInstructions: event.userInstructions ?? null,
         tokenUsage: usage,
         uploadedAt: new Date(),
-        difficulty: event.quizDifficulty,
+        difficulty: event.difficulty,
       })
       .returning({ id: quizzes.id })
 
@@ -132,6 +134,9 @@ export const handler = async (event: LambdaEvent) => {
     const sourceTexts = await Promise.all(allKeys.map((k) => fetchSourceText(event.bucket, k)))
     const sourceText = sourceTexts.join('\n\n---\n\n')
 
+    let apiKey
+    if (event.apiKeyId) apiKey = await getByokById(event.apiKeyId, event.userId, db)
+
     const result = event.quiz
       ? { quiz: event.quiz }
       : await generateQuizFromText({
@@ -142,7 +147,8 @@ export const handler = async (event: LambdaEvent) => {
           userBio: event.userBio,
           defaultTitle: event.title,
           model: event.model,
-          difficulty: event.quizDifficulty,
+          difficulty: event.difficulty,
+          apiKey,
         })
 
     const quizRow = await persistQuiz(result, event, {

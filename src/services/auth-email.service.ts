@@ -3,9 +3,10 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 
-import authService from './authService'
-import emailService from './emailService'
-import userService from './userService'
+import authService from './auth.service'
+import emailService from './clients/email.client'
+import userService from './user.service'
+import { logger } from '../config/logger'
 import { db } from '../database/database'
 import { users } from '../database/schema'
 import { AppError } from '../helpers/AppError'
@@ -93,25 +94,25 @@ class AuthEmailService {
     const user = await userService.findByEmail(email)
 
     if (!user) {
-      console.log('[password-reset] user not found:', email)
+      logger.info('Password reset: user not found', { email })
       return
     }
 
     if (!user.password) {
-      console.log('[password-reset] user has no password (OAuth-only):', email)
+      logger.info('Password reset: user has no password (OAuth-only)', { email })
       return
     }
 
     if (!user.isVerified) {
-      console.log('[password-reset] user not verified:', email)
+      logger.info('Password reset: user not verified', { email })
       return
     }
 
     const token = crypto.randomBytes(32).toString('hex')
     await Otp.upsert(`reset:${user.id}`, token, RESET_EXPIRATION_MS)
-    console.log('[password-reset] sending email to:', email)
+    logger.info('Password reset: sending email', { email })
     await this.sendPasswordResetEmail(user.email, user.fullName, token)
-    console.log('[password-reset] email sent to:', email)
+    logger.info('Password reset: email sent', { email })
   }
 
   async setPassword(userId: string, password: string) {

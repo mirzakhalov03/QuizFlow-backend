@@ -1,12 +1,13 @@
 import { InvokeCommand, type InvokeCommandOutput } from '@aws-sdk/client-lambda'
 import { eq } from 'drizzle-orm'
 
-import { lambdaClient } from './lambdaClient'
-import { db } from '../database/database'
-import { quizJobs } from '../database/schema'
-import { AppError } from '../helpers/AppError'
-import type { DifficultyType } from '../types/difficultyTypes'
-import type { QuestionType } from '../types/questionTypes'
+import { db } from '../../database/database'
+import { quizJobs } from '../../database/schema'
+import { AppError } from '../../helpers/AppError'
+import type { DifficultyType } from '../../types/difficultyTypes'
+import type { QuestionType } from '../../types/questionTypes'
+import { lambdaClient } from '../clients/lambda.client'
+
 export type QuizGeneratePayload = {
   userId: string
   bucket: string
@@ -21,6 +22,7 @@ export type QuizGeneratePayload = {
   userBio?: string | null
   difficulty?: DifficultyType
   folderId?: string
+  apiKeyId?: string
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env

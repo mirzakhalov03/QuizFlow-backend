@@ -5,8 +5,7 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 const QuestionTypeEnum = z.enum(QUESTION_TYPES)
-const DifficultyEnum = z.enum(DIFFICULTY_TYPES)
-
+const DifficultyTypeEnum = z.enum(DIFFICULTY_TYPES)
 export const GenerateQuizSourceSchema = z.object({
   source: z.enum(['file', 'notion']).default('file'),
 })
@@ -58,9 +57,10 @@ export const GenerateQuizSchema = z
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
-    difficulty: DifficultyEnum.optional(),
-
     folderId: z.string().uuid().optional(),
+    difficulty: DifficultyTypeEnum.optional(),
+
+    apiKeyId: z.uuid().optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
@@ -207,7 +207,6 @@ export const SubmitQuizSchema = z.object({
           }
         }),
     )
-    .min(1, 'At least one answer is required')
     .max(100, 'Too many answers submitted')
     .superRefine((answers, ctx) => {
       const seen = new Set<string>()

@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { questionOptions } from '../database/schema'

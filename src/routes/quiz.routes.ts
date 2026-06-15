@@ -4,15 +4,18 @@ import {
   deleteQuizByIdController,
   disableSharingController,
   enableSharingController,
+  exportQuizPdfController,
   generateQuizController,
   getJobStatusController,
   getPublicQuizController,
   getQuizByIdController,
+  getQuizResultController,
   getQuizzesController,
   patchQuizByIdController,
   submitQuizController,
 } from '../controllers/quizController'
 import { authMiddleware } from '../middlewares/authMiddleware'
+import { quizGenerationLimiter } from '../middlewares/rateLimit'
 import { validate, validateQuery } from '../middlewares/validate'
 import {
   GenerateQuizSchema,
@@ -54,6 +57,7 @@ const router = Router()
 router.post(
   '/quizzes',
   authMiddleware,
+  quizGenerationLimiter,
   validateQuery(GenerateQuizSourceSchema),
   validate(GenerateQuizSchema),
   generateQuizController,
@@ -168,6 +172,37 @@ router.get('/quizzes', authMiddleware, validateQuery(GetQuizzesSchema), getQuizz
  *         description: Quiz not found
  */
 router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/pdf:
+ *   get:
+ *     tags:
+ *       - Quiz
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Export a quiz as a printable PDF (rendered with Puppeteer)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: PDF document
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Quiz not found
+ */
+router.get('/quizzes/:id/pdf', authMiddleware, exportQuizPdfController)
 
 /**
  * @openapi
@@ -295,6 +330,32 @@ router.patch('/quizzes/:id/share/disable', authMiddleware, disableSharingControl
  *         description: Quiz not found
  */
 router.post('/quizzes/:id/submit', authMiddleware, validate(SubmitQuizSchema), submitQuizController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/result:
+ *   get:
+ *     tags:
+ *       - Quiz
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Get a quiz result with open-ended grading status and per-answer verdicts
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Result with grading status and verdicts
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Result not found
+ */
+router.get('/quizzes/:id/result', authMiddleware, getQuizResultController)
 
 /**
  * @openapi

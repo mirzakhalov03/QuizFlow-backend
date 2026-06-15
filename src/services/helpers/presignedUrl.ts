@@ -1,9 +1,9 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-import { s3BucketName, s3Region } from './s3Client'
-import { AppError } from '../helpers/AppError'
-import { buildS3ObjectUrl } from '../helpers/utils/uploadUtils'
+import { AppError } from '../../helpers/AppError'
+import { buildS3ObjectUrl } from '../../helpers/utils/uploadUtils'
+import { s3BucketName, s3Region } from '../clients/s3.client'
 
 // SDK v3 adds CRC32 checksums by default — browser fetch can't compute them.
 // This client disables automatic checksum injection so the presigned URL stays browser-safe.

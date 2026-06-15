@@ -1,6 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm'
+import { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { db } from '../database/database'
+import * as schema from '../database/schema'
 import { userApiKeys } from '../database/schema'
 import { decryptApiKeyValue, encryptApiKeyValue, maskApiKeyValue } from '../helpers/apiKeyCrypto'
 
@@ -76,4 +78,17 @@ export const deleteByok = async (id: string, userId: string) => {
     .returning({ id: userApiKeys.id })
 
   return deleted.length > 0
+}
+
+export const getByokById = async (
+  id: string,
+  userId: string,
+  dbClient: NodePgDatabase<typeof schema>,
+) => {
+  const row = await dbClient
+    .select({ encryptedKeyValue: userApiKeys.keyValue })
+    .from(userApiKeys)
+    .where(and(eq(userApiKeys.id, id), eq(userApiKeys.userId, userId)))
+  const encryptedKeyValue = row[0]?.encryptedKeyValue
+  return encryptedKeyValue ? decryptApiKeyValue(encryptedKeyValue) : undefined
 }
