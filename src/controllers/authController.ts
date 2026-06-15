@@ -11,7 +11,7 @@ import authService from '../services/auth.service'
 
 const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = req.cookies.refreshToken
+    const token = req.cookies?.refreshToken
 
     if (token) {
       await authService.clearRefreshToken(token)
