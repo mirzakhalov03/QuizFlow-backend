@@ -4,6 +4,7 @@ import {
   deleteQuizByIdController,
   disableSharingController,
   enableSharingController,
+  exportQuizPdfController,
   generateQuizController,
   getJobStatusController,
   getPublicQuizController,
@@ -171,6 +172,37 @@ router.get('/quizzes', authMiddleware, validateQuery(GetQuizzesSchema), getQuizz
  *         description: Quiz not found
  */
 router.get('/quizzes/:id', authMiddleware, getQuizByIdController)
+
+/**
+ * @openapi
+ * /quizzes/{id}/pdf:
+ *   get:
+ *     tags:
+ *       - Quiz
+ *     security:
+ *       - cookieAuth: []
+ *     summary: Export a quiz as a printable PDF (rendered with Puppeteer)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: PDF document
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Quiz not found
+ */
+router.get('/quizzes/:id/pdf', authMiddleware, exportQuizPdfController)
 
 /**
  * @openapi

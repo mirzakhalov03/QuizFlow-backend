@@ -51,6 +51,7 @@
     "openai": "^6.38.0",
     "pdf2json": "^4.0.3",
     "pg": "^8.20.0",
+    "puppeteer": "^24.10.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.19.0",
