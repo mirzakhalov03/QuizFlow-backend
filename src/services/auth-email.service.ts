@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 
 import authService from './auth.service'
 import emailService from './clients/email.client'
+import profileService from './profile.service'
 import userService from './user.service'
 import { logger } from '../config/logger'
 import { db } from '../database/database'
@@ -70,6 +71,9 @@ class AuthEmailService {
 
     await User.updateUser(user.id, { isVerified: true })
     await Otp.delete(`register:${email}`)
+    // Provision the profile here (mirrors the Google OAuth path) so every verified
+    // user always has one — keeps GET /userProfile/me a pure read.
+    await profileService.ensureProfile(user.id)
     await this.sendWelcomeEmail(user.email, user.fullName)
 
     return await this.generateTokens(user)

@@ -8,12 +8,7 @@ import UserProfileImageService from '../services/user-profile-image.service'
 
 export const getUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Auto-provision a default profile when missing. Email-registered users never
-    // get one created at signup (only the Google OAuth path calls ensureProfile),
-    // so without this they'd 404 here and never see onboarding (isOnboarded stays null).
-    const profile =
-      (await userProfile.findByUserId(req.user!.id)) ??
-      (await userProfile.create(req.user!.id, null, null))
+    const profile = await userProfile.findOrCreate(req.user!.id)
 
     return res.json(profile)
   } catch (error) {
