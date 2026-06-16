@@ -20,6 +20,8 @@ export type ChatJsonOptions = {
   schema: JsonSchema
   apiKey?: string
   temperature?: number
+  timeoutMs?: number
+  maxRetries?: number
 }
 
 const getClient = (apiKey?: string) => {
@@ -50,19 +52,23 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
   let completion: OpenAI.ChatCompletion
 
   try {
-    completion = await client.chat.completions.create({
-      model: options.model,
-      temperature: options.temperature ?? 0.4,
-      messages: options.messages,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: options.schema.name,
-          strict: options.schema.strict ?? true,
-          schema: options.schema.schema,
+    completion = await client.chat.completions.create(
+      {
+        model: options.model,
+        temperature: options.temperature ?? 0.4,
+        messages: options.messages,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: options.schema.name,
+            strict: options.schema.strict ?? true,
+            schema: options.schema.schema,
+          },
         },
       },
-    })
+      // undefined falls back to the client defaults inside the SDK.
+      { timeout: options.timeoutMs, maxRetries: options.maxRetries },
+    )
   } catch (err) {
     if (err instanceof OpenAI.APIError) {
       logger.error('OpenRouter API error', {

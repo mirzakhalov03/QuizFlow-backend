@@ -45,25 +45,21 @@ const scoreAnswers = (
   optionsById: Map<string, SelectedOption>,
   correctOptionIdsByQuestion: Map<string, Set<string>>,
 ): ScoreResult => {
-  // Classify question ids by how they're graded.
   const singleChoiceIds = new Set<string>()
   const multiSelectIds = new Set<string>()
   const openEndedIds = new Set<string>()
-  for (const q of quizQuestions) {
-    if (q.type === 'open_ended') openEndedIds.add(q.id)
-    else if (q.type === 'multi_select') multiSelectIds.add(q.id)
-    else singleChoiceIds.add(q.id)
-  }
-
   const correctnessByQuestion = new Map<string, boolean>()
 
-  // All auto-gradable questions (single-choice + multi-select) default to
-  // incorrect unless the answer proves otherwise.
-  for (const qId of singleChoiceIds) correctnessByQuestion.set(qId, false)
-  for (const qId of multiSelectIds) correctnessByQuestion.set(qId, false)
+  for (const q of quizQuestions) {
+    if (q.type === 'open_ended') {
+      openEndedIds.add(q.id)
+    } else {
+      correctnessByQuestion.set(q.id, false)
+      if (q.type === 'multi_select') multiSelectIds.add(q.id)
+      else singleChoiceIds.add(q.id)
+    }
+  }
 
-  // Open-ended: unanswered -> incorrect now; answered -> stays out of this map
-  // (null/pending) until the async grader fills it in.
   const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
   for (const qId of openEndedIds) {
     const answer = answersByQuestion.get(qId)
@@ -186,8 +182,10 @@ export const submitQuiz = async (
     if (answer.selectedOptionIds) referencedOptionIds.push(...answer.selectedOptionIds)
   }
 
+  const uniqueReferencedOptionIds = [...new Set(referencedOptionIds)]
+
   const optionRows =
-    referencedOptionIds.length > 0
+    uniqueReferencedOptionIds.length > 0
       ? await db
           .select({
             id: questionOptions.id,
@@ -195,7 +193,7 @@ export const submitQuiz = async (
             isCorrect: questionOptions.isCorrect,
           })
           .from(questionOptions)
-          .where(inArray(questionOptions.id, referencedOptionIds))
+          .where(inArray(questionOptions.id, uniqueReferencedOptionIds))
       : []
 
   const optionsById = new Map(optionRows.map((o) => [o.id, o]))
@@ -281,16 +279,22 @@ export const submitQuiz = async (
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
 
-  // Fire-and-forget: grade open-ended answers in the background so submit stays
-  // instant. The grader sets gradingStatus='failed' on handled errors; the
-  // .catch here is the safety net for anything that escapes (e.g. a DB blip in
-  // its setup queries) so a detached rejection can't crash the process.
+  // Grade open-ended answers synchronously so the response carries the final
+  // score. In-process fire-and-forget didn't survive on serverless — the host
+  // froze the process once the response returned, leaving grading stuck in
+  // 'pending'. gradeOpenEndedAnswers handles its own errors and settles the
+  // status to 'complete'/'failed' (bounded by a 30s LLM timeout), so this
+  // never throws; we just re-read the row it updated in place.
   if (gradingStatus === 'pending') {
-    gradeOpenEndedAnswers(quizId, userId).catch((err) =>
-      logger.error('Open-ended grading unhandled rejection', {
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    )
+    await gradeOpenEndedAnswers(quizId, userId)
+
+    const [finalized] = await db
+      .select()
+      .from(quizResults)
+      .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+      .limit(1)
+
+    if (finalized) return finalized
   }
 
   return result
