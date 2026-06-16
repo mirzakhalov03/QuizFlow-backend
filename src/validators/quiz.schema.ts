@@ -194,9 +194,9 @@ export const SubmitQuizSchema = z.object({
     .array(
       z
         .object({
-          questionId: z.string().uuid(),
-          selectedOptionId: z.string().uuid().optional(),
-          selectedOptionIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+          questionId: z.uuid(),
+          selectedOptionId: z.uuid().optional(),
+          selectedOptionIds: z.array(z.uuid()).min(1).max(20).optional(),
           textAnswer: z.string().max(5000).optional(),
         })
         .superRefine((data, ctx) => {
