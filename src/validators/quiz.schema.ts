@@ -196,14 +196,31 @@ export const SubmitQuizSchema = z.object({
         .object({
           questionId: z.string().uuid(),
           selectedOptionId: z.string().uuid().optional(),
+          selectedOptionIds: z.array(z.string().uuid()).min(1).max(20).optional(),
           textAnswer: z.string().max(5000).optional(),
         })
         .superRefine((data, ctx) => {
-          if (!data.selectedOptionId && !data.textAnswer) {
+          const provided =
+            (data.selectedOptionId ? 1 : 0) +
+            (data.selectedOptionIds && data.selectedOptionIds.length > 0 ? 1 : 0) +
+            (data.textAnswer && data.textAnswer.trim().length > 0 ? 1 : 0)
+
+          if (provided !== 1) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: [],
-              message: 'Either selectedOptionId or textAnswer is required',
+              message: 'Provide exactly one of selectedOptionId, selectedOptionIds, or textAnswer',
+            })
+          }
+
+          if (
+            data.selectedOptionIds &&
+            new Set(data.selectedOptionIds).size !== data.selectedOptionIds.length
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['selectedOptionIds'],
+              message: 'selectedOptionIds must not contain duplicates',
             })
           }
         }),
