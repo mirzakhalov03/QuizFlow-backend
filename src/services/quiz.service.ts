@@ -24,6 +24,7 @@ type UpdateQuizInput = {
   isTimerEnabled?: boolean
   timerDuration?: number | null
   type?: QuestionType | null
+  folderId?: string | null
 }
 
 /**
@@ -52,6 +53,7 @@ export const getQuizzes = async ({
       id: quizzes.id,
       title: quizzes.title,
       userId: quizzes.userId,
+      folderId: quizzes.folderId,
       type: quizzes.type,
       properties: quizzes.properties,
       isTimerEnabled: quizzes.isTimerEnabled,
@@ -126,6 +128,7 @@ export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: 
       isTimerEnabled: data.isTimerEnabled,
       timerDuration: data.timerDuration,
       type: data.type,
+      folderId: data.folderId,
     })
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
     .returning()
