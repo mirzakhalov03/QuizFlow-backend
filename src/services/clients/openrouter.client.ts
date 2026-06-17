@@ -3,10 +3,7 @@ import OpenAI from 'openai'
 import { logger } from '../../config/logger'
 import { AppError } from '../../helpers/AppError'
 
-export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
+export type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
 
 export type JsonSchema = {
   name: string

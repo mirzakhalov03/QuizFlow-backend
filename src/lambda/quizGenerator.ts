@@ -7,11 +7,12 @@ import { getLambdaDb } from './dbClient'
 import { s3Client } from './s3Client'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
-  extractTextFromBuffer,
+  extractSourceFromBuffer,
   normalizeQuestionType,
   QUIZ_FILE_MAX_BYTES,
   streamToBuffer,
 } from '../helpers/utils/quizLambdaUtils'
+import type { QuizSource } from '../helpers/utils/quizLambdaUtils'
 import { getByokById } from '../services/byok.service'
 import { generateQuizFromText } from '../services/helpers/quizAi'
 import type { AiQuiz, AiQuizResult } from '../services/helpers/quizAi'
@@ -111,7 +112,7 @@ const persistQuiz = async (
   return quizInsert
 }
 
-const fetchSourceText = async (bucket: string, key: string): Promise<string> => {
+const fetchSource = async (bucket: string, key: string): Promise<QuizSource> => {
   const s3Response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
 
   if (!s3Response.Body) {
@@ -119,7 +120,7 @@ const fetchSourceText = async (bucket: string, key: string): Promise<string> => 
   }
 
   const buffer = await streamToBuffer(s3Response.Body as Readable, QUIZ_FILE_MAX_BYTES)
-  return extractTextFromBuffer(buffer, s3Response.ContentType ?? '', key)
+  return extractSourceFromBuffer(buffer, s3Response.ContentType ?? '', key)
 }
 
 export const handler = async (event: LambdaEvent) => {
@@ -131,8 +132,7 @@ export const handler = async (event: LambdaEvent) => {
   const db = await getLambdaDb()
 
   try {
-    const sourceTexts = await Promise.all(allKeys.map((k) => fetchSourceText(event.bucket, k)))
-    const sourceText = sourceTexts.join('\n\n---\n\n')
+    const sources = await Promise.all(allKeys.map((k) => fetchSource(event.bucket, k)))
 
     let apiKey
     if (event.apiKeyId) apiKey = await getByokById(event.apiKeyId, event.userId, db)
@@ -140,7 +140,7 @@ export const handler = async (event: LambdaEvent) => {
     const result = event.quiz
       ? { quiz: event.quiz }
       : await generateQuizFromText({
-          sourceText,
+          sources,
           questionCount: event.questionCount,
           type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
           userInstructions: event.userInstructions,
