@@ -31,7 +31,10 @@ class NotionService {
       throw new Error('Notion token not found')
     }
 
-    return new Client({ auth: integration.accessToken })
+    return new Client({
+      auth: integration.accessToken,
+      timeoutMs: 90000,
+    })
   }
 
   async getCurrentUser(userId: string) {
