@@ -1,9 +1,9 @@
 import { and, asc, desc, eq, ilike, inArray, sql, or, isNull, ne } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
+import { folders, questionOptions, questions, quizJobs, quizzes } from '../database/schema'
+import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
-
 type GetQuizzesParams = {
   userId: string
   limit?: number
@@ -24,6 +24,7 @@ type UpdateQuizInput = {
   isTimerEnabled?: boolean
   timerDuration?: number | null
   type?: QuestionType | null
+  folderId?: string | null
 }
 
 /**
@@ -52,6 +53,7 @@ export const getQuizzes = async ({
       id: quizzes.id,
       title: quizzes.title,
       userId: quizzes.userId,
+      folderId: quizzes.folderId,
       type: quizzes.type,
       properties: quizzes.properties,
       isTimerEnabled: quizzes.isTimerEnabled,
@@ -118,6 +120,18 @@ export const getQuizById = async (id: string, userId: string) => {
 }
 
 export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: string) => {
+  if (data.folderId) {
+    const [folder] = await db
+      .select()
+      .from(folders)
+      .where(and(eq(folders.id, data.folderId), eq(folders.userId, userId)))
+      .limit(1)
+
+    if (!folder) {
+      throw new AppError('Folder not found', 404, 'NOT_FOUND')
+    }
+  }
+
   const [updatedQuiz] = await db
     .update(quizzes)
     .set({
@@ -126,6 +140,7 @@ export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: 
       isTimerEnabled: data.isTimerEnabled,
       timerDuration: data.timerDuration,
       type: data.type,
+      folderId: data.folderId,
     })
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
     .returning()
