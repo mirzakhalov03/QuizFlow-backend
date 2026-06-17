@@ -79,44 +79,34 @@ export const getQuizzes = async ({
 }
 
 export const getQuizById = async (id: string, userId: string) => {
-  const [quiz] = await db
-    .select()
+  // Single round-trip: join questions + options and regroup in code, replacing
+  // three sequential queries. ORDER BY drives both the question order and the
+  // option order within each question, which the UI relies on.
+  const rows = await db
+    .select({ quiz: quizzes, question: questions, option: questionOptions })
     .from(quizzes)
+    .leftJoin(questions, eq(questions.quizId, quizzes.id))
+    .leftJoin(questionOptions, eq(questionOptions.questionId, questions.id))
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
-    .limit(1)
+    .orderBy(asc(questions.position), asc(questionOptions.position))
 
-  if (!quiz) return null
+  if (rows.length === 0) return null
 
-  const questionRows = await db
-    .select()
-    .from(questions)
-    .where(eq(questions.quizId, id))
-    .orderBy(questions.position)
+  type Option = typeof questionOptions.$inferSelect
+  type QuestionWithOptions = typeof questions.$inferSelect & { options: Option[] }
 
-  const questionIds = questionRows.map((q) => q.id)
-
-  const optionRows =
-    questionIds.length > 0
-      ? await db
-          .select()
-          .from(questionOptions)
-          .where(inArray(questionOptions.questionId, questionIds))
-          .orderBy(questionOptions.position)
-      : []
-
-  const optionsByQuestion = optionRows.reduce<Record<string, typeof optionRows>>((acc, option) => {
-    if (!acc[option.questionId]) acc[option.questionId] = []
-    acc[option.questionId].push(option)
-    return acc
-  }, {})
-
-  return {
-    ...quiz,
-    questions: questionRows.map((q) => ({
-      ...q,
-      options: optionsByQuestion[q.id] ?? [],
-    })),
+  const questionsById = new Map<string, QuestionWithOptions>()
+  for (const row of rows) {
+    if (!row.question) continue
+    let q = questionsById.get(row.question.id)
+    if (!q) {
+      q = { ...row.question, options: [] }
+      questionsById.set(q.id, q)
+    }
+    if (row.option) q.options.push(row.option)
   }
+
+  return { ...rows[0].quiz, questions: [...questionsById.values()] }
 }
 
 export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: string) => {
@@ -168,46 +158,47 @@ export const getJobById = async (jobId: string, userId: string) => {
 }
 
 export const getPublicQuizByToken = async (shareToken: string) => {
-  const [quiz] = await db
-    .select()
+  // Single round-trip (see getQuizById). Public consumers must never see the
+  // answer key, so option columns are restricted to the safe four — no
+  // `isCorrect`, no `explanation` rubric. This projection is load-bearing.
+  const rows = await db
+    .select({
+      quiz: quizzes,
+      question: questions,
+      option: {
+        id: questionOptions.id,
+        questionId: questionOptions.questionId,
+        text: questionOptions.text,
+        position: questionOptions.position,
+      },
+    })
     .from(quizzes)
+    .leftJoin(questions, eq(questions.quizId, quizzes.id))
+    .leftJoin(questionOptions, eq(questionOptions.questionId, questions.id))
     .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
-    .limit(1)
+    .orderBy(asc(questions.position), asc(questionOptions.position))
 
-  if (!quiz) return null
+  if (rows.length === 0) return null
 
-  const questionRows = await db
-    .select()
-    .from(questions)
-    .where(eq(questions.quizId, quiz.id))
-    .orderBy(questions.position)
+  type PublicOption = { id: string; questionId: string; text: string; position: number }
+  type QuestionWithOptions = typeof questions.$inferSelect & { options: PublicOption[] }
 
-  const questionIds = questionRows.map((q) => q.id)
-
-  const optionRows =
-    questionIds.length > 0
-      ? await db
-          .select({
-            id: questionOptions.id,
-            questionId: questionOptions.questionId,
-            text: questionOptions.text,
-            position: questionOptions.position,
-          })
-          .from(questionOptions)
-          .where(inArray(questionOptions.questionId, questionIds))
-          .orderBy(questionOptions.position)
-      : []
-  const optionsByQuestion = optionRows.reduce<Record<string, typeof optionRows>>((acc, option) => {
-    if (!acc[option.questionId]) acc[option.questionId] = []
-    acc[option.questionId].push(option)
-    return acc
-  }, {})
-
-  return {
-    ...quiz,
-    questions: questionRows.map((q) => ({ ...q, options: optionsByQuestion[q.id] ?? [] })),
+  const questionsById = new Map<string, QuestionWithOptions>()
+  for (const row of rows) {
+    if (!row.question) continue
+    let q = questionsById.get(row.question.id)
+    if (!q) {
+      q = { ...row.question, options: [] }
+      questionsById.set(q.id, q)
+    }
+    // A partial-object leftJoin select yields all-null fields when no option
+    // row matched, so guard on the id before treating it as a real option.
+    if (row.option && row.option.id !== null) q.options.push(row.option as PublicOption)
   }
+
+  return { ...rows[0].quiz, questions: [...questionsById.values()] }
 }
+
 export const setQuizSharing = async (id: string, userId: string, isPublic: boolean) => {
   const [updatedQuiz] = await db
     .update(quizzes)

@@ -183,6 +183,7 @@ export const userAnswers = pgTable(
     selectedOptionId: uuid('selected_option_id').references(() => questionOptions.id, {
       onDelete: 'cascade',
     }),
+    selectedOptionIds: jsonb('selected_option_ids').$type<string[]>(),
     textAnswer: text('text_answer'),
     isCorrect: boolean('is_correct'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),

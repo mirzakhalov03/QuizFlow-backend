@@ -17,6 +17,8 @@ type GradeRow = {
 
 type LlmGrades = { grades: { index: number; isCorrect: boolean }[] }
 
+const GRADING_TIMEOUT_MS = 30_000
+
 const GRADE_SCHEMA = {
   name: 'open_ended_grades',
   strict: true,
@@ -136,6 +138,8 @@ export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Pro
       model: DEFAULT_MODEL,
       schema: GRADE_SCHEMA,
       temperature: 0,
+      timeoutMs: GRADING_TIMEOUT_MS,
+      maxRetries: 1,
       messages: [
         { role: 'system', content: OPEN_ENDED_GRADING_SYSTEM_PROMPT },
         { role: 'user', content: userContent },
