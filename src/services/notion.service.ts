@@ -34,7 +34,7 @@ class NotionService {
 
     return new Client({
       auth: integration.accessToken,
-      timeoutMs: 90000,
+      timeoutMs: 30000,
     })
   }
 
@@ -306,22 +306,46 @@ class NotionService {
     try {
       return await fn()
     } catch (err) {
+      const transientCodes = [
+        'UND_ERR_CONNECT_TIMEOUT',
+        'ETIMEDOUT',
+        'ECONNRESET',
+        'EADDRINUSE',
+        'ECONNREFUSED',
+        'ENOTFOUND',
+      ]
       const isNetworkError =
-        err instanceof Error &&
-        (err.message.includes('fetch failed') ||
-          err.message.includes('UND_ERR_CONNECT_TIMEOUT') ||
-          (err as { code?: string }).code === 'UND_ERR_CONNECT_TIMEOUT')
+        (err instanceof Error &&
+          (err.message.includes('fetch failed') ||
+            err.message.toLowerCase().includes('timeout') ||
+            transientCodes.includes((err as { code?: string }).code || ''))) ||
+        (isNotionClientError(err) && err.code === 'notionhq_client_request_timeout')
 
       const isRateLimit = APIResponseError.isAPIResponseError(err) && err.status === 429
 
       if ((isNetworkError || isRateLimit) && retries > 0) {
-        logger.warn(`Notion API transient error, retrying... (${retries} left)`, {
+        let retryDelay = delay
+        if (isRateLimit && APIResponseError.isAPIResponseError(err)) {
+          const headers = err.headers as Record<string, string | undefined> & {
+            get?: (key: string) => string | null
+          }
+          const retryAfterHeader =
+            typeof headers.get === 'function' ? headers.get('retry-after') : headers['retry-after']
+          if (retryAfterHeader) {
+            const parsed = parseInt(retryAfterHeader, 10)
+            if (!isNaN(parsed)) {
+              retryDelay = parsed * 1000
+            }
+          }
+        }
+
+        logger.warn('Notion API transient error, retrying... (' + retries + ' left)', {
           error: err instanceof Error ? err.message : String(err),
           cause:
             (err as { cause?: { code?: string } }).cause?.code || (err as { code?: string }).code,
         })
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        return this.withRetry(fn, retries - 1, delay * 2)
+        await new Promise((resolve) => setTimeout(resolve, retryDelay))
+        return this.withRetry(fn, retries - 1, retryDelay === delay ? delay * 2 : delay)
       }
       throw err
     }
