@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 
 import { DEFAULT_MODEL } from '../../constants/models'
+import type { QuizSource } from '../../helpers/utils/quizLambdaUtils'
 import { buildQuizSystemPrompt } from '../../prompts'
 import type { DifficultyType } from '../../types/difficultyTypes'
 import { QUESTION_TYPES } from '../../types/questionTypes'
@@ -33,7 +34,7 @@ export type AiQuizResult = {
 }
 
 type GenerateOptions = {
-  sourceText: string
+  sources: QuizSource[]
   questionCount?: number
   type?: QuestionType
   userInstructions?: string
@@ -86,7 +87,7 @@ const buildSchema = (type?: QuestionType) => ({
 })
 
 export const generateQuizFromText = async ({
-  sourceText,
+  sources,
   questionCount,
   type,
   userInstructions,
@@ -99,20 +100,45 @@ export const generateQuizFromText = async ({
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
 
-  const truncated = sourceText.slice(0, SOURCE_TEXT_LIMIT)
-  const wasTruncated = sourceText.length > SOURCE_TEXT_LIMIT
+  const textParts = sources.filter(
+    (s): s is Extract<QuizSource, { kind: 'text' }> => s.kind === 'text',
+  )
+  const pdfParts = sources.filter(
+    (s): s is Extract<QuizSource, { kind: 'pdf' }> => s.kind === 'pdf',
+  )
 
-  const userParts = [
-    `Source material${wasTruncated ? ' (truncated)' : ''}:\n"""\n${truncated}\n"""`,
-  ]
+  const joinedText = textParts.map((s) => s.text).join('\n\n---\n\n')
+  const truncated = joinedText.slice(0, SOURCE_TEXT_LIMIT)
+  const wasTruncated = joinedText.length > SOURCE_TEXT_LIMIT
 
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = []
+
+  for (const pdf of pdfParts) {
+    content.push({
+      type: 'file',
+      file: {
+        filename: pdf.filename,
+        file_data: `data:application/pdf;base64,${pdf.buffer.toString('base64')}`,
+      },
+    })
+  }
+
+  const textParagraphs: string[] = []
+  if (truncated) {
+    textParagraphs.push(
+      `Source material${wasTruncated ? ' (truncated)' : ''}:\n"""\n${truncated}\n"""`,
+    )
+  } else if (pdfParts.length > 0) {
+    textParagraphs.push('Source material is the attached PDF document(s).')
+  }
   if (userInstructions) {
-    userParts.push(`Additional instructions from the user:\n${userInstructions}`)
+    textParagraphs.push(`Additional instructions from the user:\n${userInstructions}`)
+  }
+  if (defaultTitle) {
+    textParagraphs.push(`Suggested title (you may improve it): ${defaultTitle}`)
   }
 
-  if (defaultTitle) {
-    userParts.push(`Suggested title (you may improve it): ${defaultTitle}`)
-  }
+  content.push({ type: 'text', text: textParagraphs.join('\n\n') })
 
   const result = await chatJSON<AiQuiz>({
     apiKey,
@@ -121,7 +147,7 @@ export const generateQuizFromText = async ({
     temperature: 0.3,
     messages: [
       { role: 'system', content: buildQuizSystemPrompt(type, count, userBio, difficulty) },
-      { role: 'user', content: userParts.join('\n\n') },
+      { role: 'user', content },
     ],
   })
 
