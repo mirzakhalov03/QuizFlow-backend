@@ -25,15 +25,23 @@ export type GenerateQuizFromNotionInput = {
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
+const CONCURRENT_NOTION_FETCHES = 5
 
 class NotionQuizService {
   async generateQuizFromNotionPage(input: GenerateQuizFromNotionInput) {
     try {
-      // 1. Fetch content from all pages in parallel
+      // 1. Fetch content from all pages with concurrency limit
       const uniquePageIds = [...new Set(input.pageIds)]
-      const pageContents = await Promise.all(
-        uniquePageIds.map((pageId) => notionService.getPageContent(input.userId, pageId)),
-      )
+      const pageContents: string[] = []
+
+      // Simple chunked processing to avoid firing too many parallel fetches
+      for (let i = 0; i < uniquePageIds.length; i += CONCURRENT_NOTION_FETCHES) {
+        const chunk = uniquePageIds.slice(i, i + CONCURRENT_NOTION_FETCHES)
+        const chunkResults = await Promise.all(
+          chunk.map((pageId) => notionService.getPageContent(input.userId, pageId)),
+        )
+        pageContents.push(...chunkResults)
+      }
 
       const notionContent = pageContents.filter((c) => c.trim().length > 0).join('\n\n---\n\n')
 
