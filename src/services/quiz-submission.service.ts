@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 
 import { gradeOpenEndedAnswers } from './open-ended-grading.service'
 import { logger } from '../config/logger'
@@ -226,7 +226,6 @@ export const submitQuiz = async (
   const { correctnessByQuestion, correctAnswers, totalQuestions, wrongAnswers, gradingStatus } =
     scoreAnswers(quizQuestions, answers, optionsById, correctOptionIdsByQuestion)
 
-  const quizQuestionIds = quizQuestions.map((q) => q.id)
   const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
 
   const result = await db.transaction(async (tx) => {
@@ -245,15 +244,26 @@ export const submitQuiz = async (
       }
     })
 
-    // This submission is the authoritative attempt: replace any prior answers
-    // for this quiz so questions left unanswered now don't keep stale answers
-    // (and stale grading verdicts) from an earlier submission.
-    await tx
-      .delete(userAnswers)
-      .where(and(eq(userAnswers.userId, userId), inArray(userAnswers.questionId, quizQuestionIds)))
-
+    // This submission is the authoritative attempt. We upsert a row for every
+    // question in the quiz (answered or not), so questions left unanswered now
+    // overwrite any stale answer/verdict from an earlier submission. Upserting
+    // (rather than delete-then-insert) keeps a concurrent double-submit — e.g.
+    // two tabs, or a retry — from racing on the (userId, questionId) unique
+    // constraint and 500ing.
     if (answerValues.length > 0) {
-      await tx.insert(userAnswers).values(answerValues)
+      await tx
+        .insert(userAnswers)
+        .values(answerValues)
+        .onConflictDoUpdate({
+          target: [userAnswers.userId, userAnswers.questionId],
+          set: {
+            selectedOptionId: sql`excluded.selected_option_id`,
+            selectedOptionIds: sql`excluded.selected_option_ids`,
+            textAnswer: sql`excluded.text_answer`,
+            isCorrect: sql`excluded.is_correct`,
+            updatedAt: new Date(),
+          },
+        })
     }
 
     const [resultRow] = await tx
