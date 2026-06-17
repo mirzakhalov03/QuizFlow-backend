@@ -1,9 +1,10 @@
-import { Client, isFullBlock } from '@notionhq/client'
+import { Client, isFullBlock, isNotionClientError, APIResponseError } from '@notionhq/client'
 import type {
   PageObjectResponse,
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
 
+import { logger } from '../config/logger'
 import UserIntegrations from '../models/userIntegration.model'
 
 type NotionPage = {
@@ -39,24 +40,28 @@ class NotionService {
 
   async getCurrentUser(userId: string) {
     const notion = await this.getClientForUser(userId)
-    return await notion.users.me({})
+    return this.withRetry(() => notion.users.me({}))
   }
 
   async searchPages(userId: string, query: string) {
     const notion = await this.getClientForUser(userId)
-    return await notion.search({
-      query,
-      filter: { value: 'page', property: 'object' },
-    })
+    return this.withRetry(() =>
+      notion.search({
+        query,
+        filter: { value: 'page', property: 'object' },
+      }),
+    )
   }
 
   async getAccessiblePages(userId: string): Promise<NotionPage[]> {
     const notion = await this.getClientForUser(userId)
 
-    const searchResults = await notion.search({
-      filter: { value: 'page', property: 'object' },
-      page_size: 100,
-    })
+    const searchResults = await this.withRetry(() =>
+      notion.search({
+        filter: { value: 'page', property: 'object' },
+        page_size: 100,
+      }),
+    )
 
     return searchResults.results
       .filter((result): result is PageObjectResponse => 'properties' in result)
@@ -133,7 +138,9 @@ class NotionService {
   ): Promise<void> {
     if (state.bytes >= this.MAX_CONTENT_BYTES || depth > 3) return
 
-    const blocks = await notion.blocks.children.list({ block_id: blockId, page_size: 100 })
+    const blocks = await this.withRetry(() =>
+      notion.blocks.children.list({ block_id: blockId, page_size: 100 }),
+    )
 
     for (const block of blocks.results) {
       if (!isFullBlock(block) || state.bytes >= this.MAX_CONTENT_BYTES) break
@@ -144,40 +151,57 @@ class NotionService {
           const notionAny = notion as unknown as {
             request: (args: Record<string, unknown>) => Promise<{ results: unknown[] }>
           }
-          const rows = await notionAny.request({
-            path: `databases/${block.id}/query`,
-            method: 'POST',
-            query: { page_size: 100 },
-            body: {},
-          })
+          const rows = await this.withRetry(() =>
+            notionAny.request({
+              path: `databases/${block.id}/query`,
+              method: 'POST',
+              query: { page_size: 100 },
+              body: {},
+            }),
+          )
           for (const row of rows.results) {
             if (state.bytes >= this.MAX_CONTENT_BYTES) break
             const rowText = this.formatPageBlock(row)
             if (rowText) this.push(content, state, rowText)
           }
-        } catch {
-          // silently skip unreadable databases
+        } catch (err) {
+          logger.warn('Failed to fetch Notion database content', {
+            databaseId: block.id,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       } else if (block.type === 'child_page') {
         this.push(content, state, '## ' + (block.child_page.title || 'Untitled Subpage'))
         try {
           await this.fetchBlocksContent(notion, block.id, content, state, depth + 1)
-        } catch {
-          // silently skip unreadable subpages
+        } catch (err) {
+          logger.warn('Failed to fetch Notion subpage content', {
+            pageId: block.id,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       } else if (block.type === 'table') {
-        const tableRows = await notion.blocks.children.list({ block_id: block.id, page_size: 100 })
-        for (const row of tableRows.results) {
-          if (
-            !isFullBlock(row) ||
-            row.type !== 'table_row' ||
-            state.bytes >= this.MAX_CONTENT_BYTES
+        try {
+          const tableRows = await this.withRetry(() =>
+            notion.blocks.children.list({ block_id: block.id, page_size: 100 }),
           )
-            continue
-          const cells = (row.table_row.cells as Array<Array<{ plain_text: string }>>)
-            .map((cell) => cell.map((t) => t.plain_text).join(''))
-            .filter(Boolean)
-          if (cells.length > 0) this.push(content, state, cells.join(' | '))
+          for (const row of tableRows.results) {
+            if (
+              !isFullBlock(row) ||
+              row.type !== 'table_row' ||
+              state.bytes >= this.MAX_CONTENT_BYTES
+            )
+              continue
+            const cells = (row.table_row.cells as Array<Array<{ plain_text: string }>>)
+              .map((cell) => cell.map((t) => t.plain_text).join(''))
+              .filter(Boolean)
+            if (cells.length > 0) this.push(content, state, cells.join(' | '))
+          }
+        } catch (err) {
+          logger.warn('Failed to fetch Notion table content', {
+            tableId: block.id,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       } else if (block.type === 'toggle') {
         const text = this.extractRichText(block.toggle.rich_text)
@@ -273,6 +297,34 @@ class NotionService {
     })
 
     return await res.json()
+  }
+
+  /**
+   * Helper to retry Notion API calls on transient network failures or rate limits.
+   */
+  private async withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    try {
+      return await fn()
+    } catch (err) {
+      const isNetworkError =
+        err instanceof Error &&
+        (err.message.includes('fetch failed') ||
+          err.message.includes('UND_ERR_CONNECT_TIMEOUT') ||
+          (err as { code?: string }).code === 'UND_ERR_CONNECT_TIMEOUT')
+
+      const isRateLimit = APIResponseError.isAPIResponseError(err) && err.status === 429
+
+      if ((isNetworkError || isRateLimit) && retries > 0) {
+        logger.warn(`Notion API transient error, retrying... (${retries} left)`, {
+          error: err instanceof Error ? err.message : String(err),
+          cause:
+            (err as { cause?: { code?: string } }).cause?.code || (err as { code?: string }).code,
+        })
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        return this.withRetry(fn, retries - 1, delay * 2)
+      }
+      throw err
+    }
   }
 }
 
