@@ -25,8 +25,8 @@ describe('validate Middleware', () => {
 
     validate(schema)(mockReq as Request, mockRes as Response, mockNext)
 
-    expect(vi.mocked(mockNext).mock.calls.length).to.equal(1)
-    expect(mockReq.body).to.deep.equal({ name: 'John' })
+    expect(mockNext).toHaveBeenCalledTimes(1)
+    expect(mockReq.body).toEqual({ name: 'John' })
   })
 
   it('should return 400 if validation fails', () => {
