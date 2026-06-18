@@ -32,6 +32,13 @@ export type KeyUsageSummary = {
   percentage: number
 }
 
+export type ModelUsageSummary = {
+  modelName: string
+  tokensUsed: number
+  quizCount: number
+  percentage: number
+}
+
 export type AnalyticsSummary = {
   totalQuizzesTaken: number
   averageScore: number
@@ -40,6 +47,7 @@ export type AnalyticsSummary = {
   history: QuizHistoryItem[]
   totalTokensUsed: number
   keyUsageBreakdown: KeyUsageSummary[]
+  modelUsageBreakdown: ModelUsageSummary[]
 }
 
 const toPercent = (correct: number, total: number) => (total > 0 ? (correct / total) * 100 : 0)
@@ -65,8 +73,10 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       tokensUsed: quizJobs.tokensUsed,
       apiKeyId: quizJobs.apiKeyId,
       apiKeyName: quizJobs.apiKeyName,
+      properties: quizzes.properties,
     })
     .from(quizJobs)
+    .leftJoin(quizzes, eq(quizJobs.quizId, quizzes.id))
     .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done')))
 
   let totalTokensUsed = 0
@@ -74,6 +84,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     string,
     { keyId: string | null; keyName: string; tokens: number; count: number }
   >()
+  const modelMap = new Map<string, { modelName: string; tokens: number; count: number }>()
 
   // Initialize Default Key
   keyMap.set('system', { keyId: null, keyName: 'QuizFlow Default Key', tokens: 0, count: 0 })
@@ -99,6 +110,23 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     entry.tokens += tokens
     entry.count += 1
     keyMap.set(keyKey, entry)
+
+    // Model extraction
+    let modelName = 'google/gemini-3.5-flash'
+    if (row.properties && typeof row.properties === 'object') {
+      const props = row.properties as { model?: string }
+      if (props.model) {
+        modelName = props.model
+      }
+    }
+    const modelEntry = modelMap.get(modelName) ?? {
+      modelName,
+      tokens: 0,
+      count: 0,
+    }
+    modelEntry.tokens += tokens
+    modelEntry.count += 1
+    modelMap.set(modelName, modelEntry)
   }
 
   const keyUsageBreakdown: KeyUsageSummary[] = Array.from(keyMap.values())
@@ -112,6 +140,15 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }))
     .sort((a, b) => b.tokensUsed - a.tokensUsed)
 
+  const modelUsageBreakdown: ModelUsageSummary[] = Array.from(modelMap.values())
+    .map((m) => ({
+      modelName: m.modelName,
+      tokensUsed: m.tokens,
+      quizCount: m.count,
+      percentage: totalTokensUsed > 0 ? round((m.tokens / totalTokensUsed) * 100) : 0,
+    }))
+    .sort((a, b) => b.tokensUsed - a.tokensUsed)
+
   if (quizRows.length === 0) {
     return {
       totalQuizzesTaken: 0,
@@ -121,6 +158,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       history: [],
       totalTokensUsed,
       keyUsageBreakdown,
+      modelUsageBreakdown,
     }
   }
 
@@ -184,5 +222,6 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     history,
     totalTokensUsed,
     keyUsageBreakdown,
+    modelUsageBreakdown,
   }
 }

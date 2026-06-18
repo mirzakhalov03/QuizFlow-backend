@@ -63,6 +63,7 @@ const persistQuiz = async (
         properties: {
           source,
           generatedBy: 'openrouter',
+          model: event.model || 'google/gemini-3.5-flash',
         },
         isTimerEnabled: Boolean(event.isTimerEnabled),
         timerDuration: event.isTimerEnabled ? (event.timerDuration ?? null) : null,
