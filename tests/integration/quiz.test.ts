@@ -1,0 +1,67 @@
+import request from 'supertest'
+import { describe, it, vi, beforeEach, expect } from 'vitest'
+
+import app from '../../src/app'
+import * as quizService from '../../src/services/quiz.service'
+
+vi.mock('../../src/services/quiz.service')
+
+vi.mock('../../src/middlewares/authMiddleware', () => ({
+  authMiddleware: vi.fn((req, res, next) => {
+    ;(req as Record<string, unknown>).user = { id: 'user-1' }
+    next()
+  }),
+}))
+
+describe('Quiz Integration Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('GET /quizzes', () => {
+    it('should return 200 and a list of quizzes', async () => {
+      const mockItems = [{ id: 'quiz-1', title: 'Test Quiz' }]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(quizService.getQuizzes).mockResolvedValue({ items: mockItems as any, total: 1 })
+
+      const response = await request(app).get('/quizzes')
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data.items).toHaveLength(1)
+      expect(response.body.data.items[0].title).toBe('Test Quiz')
+    })
+  })
+
+  describe('GET /quizzes/:id', () => {
+    it('should return 200 and the quiz when it exists', async () => {
+      const mockQuiz = { id: 'quiz-1', title: 'Test Quiz', questions: [] }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(quizService.getQuizById).mockResolvedValue(mockQuiz as any)
+
+      const response = await request(app).get('/quizzes/quiz-1')
+
+      expect(response.status).toBe(200)
+      expect(response.body.data.id).toBe('quiz-1')
+    })
+
+    it('should return 404 when the quiz does not exist', async () => {
+      vi.mocked(quizService.getQuizById).mockResolvedValue(null)
+
+      const response = await request(app).get('/quizzes/non-existent')
+
+      expect(response.status).toBe(404)
+    })
+  })
+
+  describe('DELETE /quizzes/:id', () => {
+    it('should return 200 when quiz is deleted', async () => {
+      vi.mocked(quizService.deleteQuizById).mockResolvedValue(true)
+
+      const response = await request(app).delete('/quizzes/quiz-1')
+
+      expect(response.status).toBe(200)
+      expect(response.body.message).toBe('Quiz deleted successfully')
+    })
+  })
+})
