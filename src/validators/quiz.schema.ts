@@ -176,8 +176,8 @@ export const GenerateQuizFromNotionSchema = z
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
 
     folderId: z.uuid().optional(),
-    apiKeyId: z.string().uuid().optional(),
-    model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
+    apiKeyId: z.uuid().optional(),
+    model: z.enum(SUPPORTED_MODELS).optional(),
     difficulty: DifficultyTypeEnum.optional(),
   })
   .superRefine((data, ctx) => {

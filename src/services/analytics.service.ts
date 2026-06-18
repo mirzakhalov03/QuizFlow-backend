@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 
+import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
 import { quizJobs, quizResults, quizzes } from '../database/schema'
 import type { QuestionType } from '../types/questionTypes'
@@ -112,11 +113,11 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     keyMap.set(keyKey, entry)
 
     // Model extraction
-    let modelName = 'google/gemini-3.5-flash'
+    let modelName = DEFAULT_MODEL
     if (row.properties && typeof row.properties === 'object') {
       const props = row.properties as { model?: string }
       if (props.model) {
-        modelName = props.model
+        modelName = props.model as typeof DEFAULT_MODEL
       }
     }
     const modelEntry = modelMap.get(modelName) ?? {
