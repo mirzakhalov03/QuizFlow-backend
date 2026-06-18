@@ -64,9 +64,12 @@ export const getQuizzes = async ({
       createdAt: quizzes.createdAt,
       uploadedAt: quizzes.uploadedAt,
       updatedAt: quizzes.updatedAt,
+      apiKeyId: quizJobs.apiKeyId,
+      apiKeyName: quizJobs.apiKeyName,
       total: sql<number>`count(*) OVER()`.as('total'),
     })
     .from(quizzes)
+    .leftJoin(quizJobs, eq(quizzes.id, quizJobs.quizId))
     .where(and(...conditions))
     .orderBy(orderBy)
     .limit(limit)
@@ -83,8 +86,15 @@ export const getQuizById = async (id: string, userId: string) => {
   // three sequential queries. ORDER BY drives both the question order and the
   // option order within each question, which the UI relies on.
   const rows = await db
-    .select({ quiz: quizzes, question: questions, option: questionOptions })
+    .select({
+      quiz: quizzes,
+      question: questions,
+      option: questionOptions,
+      apiKeyId: quizJobs.apiKeyId,
+      apiKeyName: quizJobs.apiKeyName,
+    })
     .from(quizzes)
+    .leftJoin(quizJobs, eq(quizzes.id, quizJobs.quizId))
     .leftJoin(questions, eq(questions.quizId, quizzes.id))
     .leftJoin(questionOptions, eq(questionOptions.questionId, questions.id))
     .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
@@ -106,7 +116,12 @@ export const getQuizById = async (id: string, userId: string) => {
     if (row.option) q.options.push(row.option)
   }
 
-  return { ...rows[0].quiz, questions: [...questionsById.values()] }
+  return {
+    ...rows[0].quiz,
+    apiKeyId: rows[0].apiKeyId,
+    apiKeyName: rows[0].apiKeyName,
+    questions: [...questionsById.values()],
+  }
 }
 
 export const updateQuizById = async (id: string, data: UpdateQuizInput, userId: string) => {
