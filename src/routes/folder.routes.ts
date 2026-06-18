@@ -17,7 +17,7 @@ router.use(authMiddleware)
 router.get('/folders', folderController.getFolders)
 router.get('/folders/:id', folderController.getFolderById)
 router.post('/folders', validate(CreateFolderSchema), folderController.createFolder)
-router.put('/folders/:id', validate(UpdateFolderSchema), folderController.updateFolder)
+router.patch('/folders/:id', validate(UpdateFolderSchema), folderController.updateFolder)
 router.delete('/folders/:id', folderController.deleteFolder)
 router.get('/folders/:id/quizzes', folderController.getQuizzesInFolder)
 router.patch(

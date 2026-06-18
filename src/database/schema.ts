@@ -183,6 +183,7 @@ export const userAnswers = pgTable(
     selectedOptionId: uuid('selected_option_id').references(() => questionOptions.id, {
       onDelete: 'cascade',
     }),
+    selectedOptionIds: jsonb('selected_option_ids').$type<string[]>(),
     textAnswer: text('text_answer'),
     isCorrect: boolean('is_correct'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
@@ -239,6 +240,8 @@ export const quizJobs = pgTable(
     status: jobStatusEnum('status').notNull().default('pending'),
     requestId: text('request_id'),
     tokensUsed: jsonb('tokens_used'),
+    apiKeyId: uuid('api_key_id').references(() => userApiKeys.id, { onDelete: 'set null' }),
+    apiKeyName: text('api_key_name'),
     error: text('error'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })

@@ -59,7 +59,12 @@ export const updateByok = async (
 ) => {
   const updatePayload: { keyName?: string; keyValue?: string; provider?: string } = {}
   if (data.keyName) updatePayload.keyName = data.keyName
-  if (data.keyValue) updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+  if (data.keyValue) {
+    const isMasked = data.keyValue === '********' || data.keyValue.includes('...')
+    if (!isMasked) {
+      updatePayload.keyValue = encryptApiKeyValue(data.keyValue)
+    }
+  }
   if (data.provider) updatePayload.provider = data.provider
 
   const [row] = await db

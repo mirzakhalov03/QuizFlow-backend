@@ -10,9 +10,25 @@ export type CreateByokInput = z.infer<typeof CreateByokSchema>
 
 export const UpdateByokSchema = z
   .object({
-    keyName: z.string().trim().min(1).max(100).optional(),
-    keyValue: z.string().min(8).max(2000).optional(),
-    provider: z.string().trim().min(1).optional(),
+    keyName: z.string().trim().max(100).optional().nullable(),
+    keyValue: z.string().max(2000).optional().nullable(),
+    provider: z.string().trim().optional().nullable(),
+  })
+  .transform((data) => {
+    const clean = (val: string | null | undefined) => {
+      if (val === null || val === undefined || val.trim() === '') {
+        return undefined
+      }
+      return val
+    }
+    return {
+      keyName: clean(data.keyName),
+      keyValue:
+        data.keyValue === null || data.keyValue === undefined || data.keyValue.trim() === ''
+          ? undefined
+          : data.keyValue,
+      provider: clean(data.provider),
+    }
   })
   .superRefine((data, ctx) => {
     const { keyName, keyValue, provider } = data
@@ -23,6 +39,17 @@ export const UpdateByokSchema = z
         path: [],
         message: 'At least one of keyName, keyValue or provider is required',
       })
+    }
+
+    if (keyValue) {
+      const isMasked = keyValue === '********' || keyValue.includes('...')
+      if (!isMasked && keyValue.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['keyValue'],
+          message: 'keyValue must be at least 8 characters',
+        })
+      }
     }
   })
 

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 
 import { getLambdaDb } from './dbClient'
 import { s3Client } from './s3Client'
+import { DEFAULT_MODEL } from '../constants/models'
 import { questionOptions, questions, quizJobs, quizzes } from '../database/schema'
 import {
   extractSourceFromBuffer,
@@ -63,6 +64,7 @@ const persistQuiz = async (
         properties: {
           source,
           generatedBy: 'openrouter',
+          model: event.model || DEFAULT_MODEL,
         },
         isTimerEnabled: Boolean(event.isTimerEnabled),
         timerDuration: event.isTimerEnabled ? (event.timerDuration ?? null) : null,

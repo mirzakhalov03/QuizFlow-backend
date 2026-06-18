@@ -40,6 +40,9 @@ export const generateQuizFromNotion = async (
       type,
       questionCount,
       folderId,
+      apiKeyId,
+      model,
+      difficulty,
     } = req.body as GenerateQuizFromNotionInput
 
     const payload: NotionQuizServiceInput = {
@@ -52,6 +55,9 @@ export const generateQuizFromNotion = async (
       type,
       questionCount,
       folderId,
+      apiKeyId,
+      model,
+      difficulty,
     }
 
     const result = await notionQuizService.generateQuizFromNotionPage(payload)
