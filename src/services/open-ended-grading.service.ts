@@ -46,10 +46,12 @@ const GRADE_SCHEMA = {
 /**
  * Recomputes the score from the persisted per-answer verdicts. correctAnswers =
  * every userAnswer for the quiz with isCorrect=true (auto-gradable + open-ended);
- * totalQuestions is left as set at submit. Idempotent — safe to re-run.
+ * totalQuestions is left as set at submit. Updates only the given attempt's
+ * result row by id. Idempotent — safe to re-run.
  */
 const finalizeScore = async (
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  resultId: string,
   quizId: string,
   userId: string,
 ) => {
@@ -68,7 +70,7 @@ const finalizeScore = async (
   const [current] = await tx
     .select({ totalQuestions: quizResults.totalQuestions })
     .from(quizResults)
-    .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+    .where(eq(quizResults.id, resultId))
 
   if (!current) return
 
@@ -79,17 +81,14 @@ const finalizeScore = async (
       wrongAnswers: current.totalQuestions - correctAnswers,
       gradingStatus: 'complete',
     })
-    .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+    .where(eq(quizResults.id, resultId))
 }
 
-export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Promise<void> => {
-  // Count auto-gradable questions so we can shrink the denominator on failure.
-  const allQuestions = await db
-    .select({ id: questions.id, type: questions.type })
-    .from(questions)
-    .where(eq(questions.quizId, quizId))
-  const autoGradableCount = allQuestions.filter((q) => q.type !== 'open_ended').length
-
+export const gradeOpenEndedAnswers = async (
+  resultId: string,
+  quizId: string,
+  userId: string,
+): Promise<void> => {
   // Load each answered open-ended question with its model answer + rubric.
   const rows: GradeRow[] = await db
     .select({
@@ -117,7 +116,7 @@ export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Pro
     await db
       .update(quizResults)
       .set({ gradingStatus: 'complete' })
-      .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+      .where(eq(quizResults.id, resultId))
     return
   }
 
@@ -161,29 +160,33 @@ export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Pro
           )
       }
 
-      await finalizeScore(tx, quizId, userId)
+      await finalizeScore(tx, resultId, quizId, userId)
     })
   } catch (err) {
     logger.error('Open-ended grading failed', {
+      resultId,
       error: err instanceof Error ? err.message : String(err),
     })
-    // Degrade gracefully: drop open-ended from the denominator and leave their
-    // verdicts null (the UI shows them as ungraded). correctAnswers keeps the
-    // auto-gradable count already persisted at submit.
+    // Degrade gracefully: keep totalQuestions intact so the attempt still shows
+    // up in history/analytics. Open-ended verdicts stay null (UI shows them as
+    // ungraded). correctAnswers stays at the auto-gradable count from submit,
+    // so the percentage reflects what we could actually score.
     const [current] = await db
-      .select({ correctAnswers: quizResults.correctAnswers })
+      .select({
+        totalQuestions: quizResults.totalQuestions,
+        correctAnswers: quizResults.correctAnswers,
+      })
       .from(quizResults)
-      .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+      .where(eq(quizResults.id, resultId))
 
     if (current) {
       await db
         .update(quizResults)
         .set({
-          totalQuestions: autoGradableCount,
-          wrongAnswers: autoGradableCount - current.correctAnswers,
+          wrongAnswers: current.totalQuestions - current.correctAnswers,
           gradingStatus: 'failed',
         })
-        .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+        .where(eq(quizResults.id, resultId))
     }
   }
 }
