@@ -232,7 +232,7 @@ export const exportQuizPdfController = async (req: Request, res: Response, next:
       throw new AppError('Quiz not found', 404, 'NOT_FOUND')
     }
 
-    const withAnswers = req.query.withAnswers !== 'false'
+    const withAnswers = String(req.query.withAnswers) !== 'false'
     const pdf = await generateQuizPdf(quiz, withAnswers)
 
     const safeName = quiz.title.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'quiz'
