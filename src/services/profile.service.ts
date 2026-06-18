@@ -8,16 +8,8 @@ type GoogleProfile = {
 }
 
 class ProfileService {
-  async ensureProfile(userId: string, profile: GoogleProfile) {
-    const existing = await userProfile.findByUserId(userId)
-
-    if (existing) return existing
-
-    return await userProfile.createUserProfile({
-      userId,
-      bio: null,
-      profilePicture: profile.picture ?? null,
-    })
+  async ensureProfile(userId: string, profile?: GoogleProfile) {
+    return await userProfile.findOrCreate(userId, null, profile?.picture ?? null)
   }
 
   async getProfileBio(userId: string) {

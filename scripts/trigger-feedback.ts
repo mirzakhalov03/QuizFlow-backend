@@ -1,7 +1,7 @@
 import 'dotenv/config'
 
-import { publishFeedbackJob } from '../src/services/feedbackProducer'
-import { getEligibleUserIds } from '../src/services/feedbackService'
+import { getEligibleUserIds } from '../src/services/feedback.service'
+import { publishFeedbackJob } from '../src/services/helpers/feedbackProducer'
 
 /**
  * Manually publish feedback jobs without waiting for the 2am cron.

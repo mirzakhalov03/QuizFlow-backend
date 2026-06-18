@@ -1,0 +1,1 @@
+CREATE INDEX "folders_user_id_idx" ON "folders" USING btree ("user_id");

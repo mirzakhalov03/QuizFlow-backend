@@ -4,15 +4,11 @@ import { successResponse } from '../helpers/apiResponse'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import User from '../models/user.model'
 import userProfile from '../models/userProfile.model'
-import UserProfileImageService from '../services/userProfileImageService'
+import UserProfileImageService from '../services/user-profile-image.service'
 
 export const getUserProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const profile = await userProfile.findByUserId(req.user!.id)
-
-    if (!profile) {
-      return res.status(404).json({ message: 'Profile not found' })
-    }
+    const profile = await userProfile.findOrCreate(req.user!.id)
 
     return res.json(profile)
   } catch (error) {

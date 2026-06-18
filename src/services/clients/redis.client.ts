@@ -1,5 +1,7 @@
 import { createClient } from 'redis'
 
+import { logger } from '../../config/logger'
+
 const REDIS_HOST = process.env.REDIS_HOST ?? 'localhost'
 const REDIS_PORT = Number(process.env.REDIS_PORT ?? 6379)
 
@@ -42,7 +44,7 @@ const getRedisClient = async (): Promise<RedisClient> => {
       },
     })
     client.on('error', (err) => {
-      console.error('[Redis] Client error:', errText(err))
+      logger.error('Redis client error', { error: errText(err) })
     })
   }
 
@@ -71,7 +73,7 @@ export const acquireFeedbackLock = async (userId: string): Promise<boolean> => {
     const result = await redis.set(lockKey(userId), '1', { NX: true, EX: LOCK_TTL_SECONDS })
     return result === 'OK'
   } catch (err) {
-    console.warn('[Redis] Lock acquire failed, failing open:', errText(err))
+    logger.warn('Redis lock acquire failed, failing open', { userId, error: errText(err) })
     return true
   }
 }
@@ -86,6 +88,6 @@ export const releaseFeedbackLock = async (userId: string): Promise<void> => {
     await redis.del(lockKey(userId))
   } catch (err) {
     // TTL will clean it up eventually
-    console.warn('[Redis] Lock release failed, relying on TTL:', errText(err))
+    logger.warn('Redis lock release failed, relying on TTL', { userId, error: errText(err) })
   }
 }

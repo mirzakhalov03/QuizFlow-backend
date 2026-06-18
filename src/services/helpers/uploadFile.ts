@@ -3,9 +3,9 @@ import { Readable } from 'stream'
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 
-import { s3BucketName, s3Client, s3Region } from './s3Client'
-import { AppError } from '../helpers/AppError'
-import { buildS3ObjectUrl, isReadableStream } from '../helpers/utils/uploadUtils'
+import { AppError } from '../../helpers/AppError'
+import { buildS3ObjectUrl, isReadableStream } from '../../helpers/utils/uploadUtils'
+import { s3BucketName, s3Client, s3Region } from '../clients/s3.client'
 
 type UploadOptions = {
   key?: string

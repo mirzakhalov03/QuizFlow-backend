@@ -7,6 +7,10 @@ import type { QuestionType } from '../../types/questionTypes'
 /** Maximum file size allowed to be read from S3 for quiz generation (25 MB) */
 export const QUIZ_FILE_MAX_BYTES = 25 * 1024 * 1024
 
+export type QuizSource =
+  | { kind: 'text'; text: string }
+  | { kind: 'pdf'; buffer: Buffer; filename: string }
+
 export const streamToBuffer = async (stream: Readable, maxBytes?: number): Promise<Buffer> => {
   const chunks: Buffer[] = []
   let totalBytes = 0
@@ -19,65 +23,6 @@ export const streamToBuffer = async (stream: Readable, maxBytes?: number): Promi
     chunks.push(buffer)
   }
   return Buffer.concat(chunks)
-}
-
-const PDF_PARSE_TIMEOUT_MS = 45_000
-
-const extractPdfText = (buffer: Buffer): Promise<string> => {
-  // pdf2json is CJS and callback-based — pass verbosity=0 to suppress link/form warnings
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const PDFParser = require('pdf2json') as new (
-    context?: null,
-    verbosity?: number,
-  ) => {
-    on(
-      event: 'pdfParser_dataReady',
-      cb: (data: { Pages: Array<{ Texts: Array<{ R: Array<{ T: string }> }> }> }) => void,
-    ): void
-    on(event: 'pdfParser_dataError', cb: (err: { parserError: Error }) => void): void
-    parseBuffer(buf: Buffer): void
-  }
-
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`PDF parsing exceeded ${PDF_PARSE_TIMEOUT_MS / 1000}s`)),
-      PDF_PARSE_TIMEOUT_MS,
-    )
-
-    // verbosity=0 suppresses the per-link "Unsupported: field.type of Link" console noise
-    const parser = new PDFParser(null, 0)
-
-    parser.on('pdfParser_dataError', ({ parserError }) => {
-      clearTimeout(timer)
-      reject(parserError)
-    })
-
-    parser.on('pdfParser_dataReady', (data) => {
-      clearTimeout(timer)
-      const safeDecode = (s: string) => {
-        try {
-          return decodeURIComponent(s)
-        } catch {
-          return s
-        }
-      }
-      const text = data.Pages.map((page) => {
-        const blocks = page.Texts.map((t) => t.R.map((r) => safeDecode(r.T)).join(''))
-        return blocks.join('\n')
-      }).join('\n\n')
-
-      const trimmed = text.trim()
-      if (!trimmed) {
-        reject(
-          new Error('PDF appears to be empty or contains only images — no text could be extracted'),
-        )
-      } else {
-        resolve(trimmed)
-      }
-    })
-
-    parser.parseBuffer(buffer)
-  })
 }
 
 const extractDocxText = async (buffer: Buffer): Promise<string> => {
@@ -117,27 +62,24 @@ const extractPptxText = (buffer: Buffer): string => {
   return text
 }
 
-export const extractTextFromBuffer = async (
+export const extractSourceFromBuffer = async (
   buffer: Buffer,
   contentType: string,
   key: string,
-): Promise<string> => {
+): Promise<QuizSource> => {
   const lowerKey = key.toLowerCase()
   const isPdf = contentType === 'application/pdf' || lowerKey.endsWith('.pdf')
   const isDocx = contentType.includes('wordprocessingml') || lowerKey.endsWith('.docx')
   const isPptx = contentType.includes('presentationml') || lowerKey.endsWith('.pptx')
 
-  if (isPdf) return extractPdfText(buffer)
-  if (isDocx) return extractDocxText(buffer)
-  if (isPptx) return extractPptxText(buffer)
+  if (isPdf) {
+    const filename = key.split('/').pop() || 'document.pdf'
+    return { kind: 'pdf', buffer, filename }
+  }
+  if (isDocx) return { kind: 'text', text: await extractDocxText(buffer) }
+  if (isPptx) return { kind: 'text', text: extractPptxText(buffer) }
 
-  return buffer.toString('utf-8')
-}
-
-/** @deprecated Use streamToBuffer + extractTextFromBuffer instead */
-export const streamToString = async (stream: Readable, maxBytes?: number) => {
-  const buffer = await streamToBuffer(stream, maxBytes)
-  return buffer.toString('utf-8')
+  return { kind: 'text', text: buffer.toString('utf-8') }
 }
 
 export const normalizeQuestionType = (value: string | undefined): QuestionType => {

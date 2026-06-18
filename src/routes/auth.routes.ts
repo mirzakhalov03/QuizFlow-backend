@@ -11,10 +11,12 @@ import {
 } from '../controllers/authController'
 import { authEmailController } from '../controllers/authEmailController'
 import { authMiddleware } from '../middlewares/authMiddleware'
+import { authLimiter, otpVerifyLimiter } from '../middlewares/rateLimit'
 import { validate } from '../middlewares/validate'
 import {
   AuthLoginSchema,
   AuthRegisterSchema,
+  ChangePasswordSchema,
   DeleteAccountConfirmSchema,
   PasswordResetConfirmSchema,
   PasswordResetRequestSchema,
@@ -24,21 +26,29 @@ import {
 
 const router = express.Router()
 
-router.post('/auth/register', validate(AuthRegisterSchema), authEmailController.register)
+router.post(
+  '/auth/register',
+  authLimiter,
+  validate(AuthRegisterSchema),
+  authEmailController.register,
+)
 router.post(
   '/auth/register/confirm',
+  otpVerifyLimiter,
   validate(RegisterConfirmSchema),
   authEmailController.confirmRegistration,
 )
-router.post('/auth/login', validate(AuthLoginSchema), authEmailController.login)
+router.post('/auth/login', otpVerifyLimiter, validate(AuthLoginSchema), authEmailController.login)
 router.post(
   '/auth/password-reset',
   validate(PasswordResetRequestSchema),
+  authLimiter,
   authEmailController.requestPasswordReset,
 )
 router.post(
   '/auth/password-reset/confirm',
   validate(PasswordResetConfirmSchema),
+  otpVerifyLimiter,
   authEmailController.resetPassword,
 )
 router.post(
@@ -48,6 +58,13 @@ router.post(
   authEmailController.setPassword,
 )
 router.post(
+  '/auth/change-password',
+  authMiddleware,
+  otpVerifyLimiter,
+  validate(ChangePasswordSchema),
+  authEmailController.changePassword,
+)
+router.post(
   '/auth/delete-account/request',
   authMiddleware,
   authEmailController.requestDeleteAccount,
@@ -55,6 +72,7 @@ router.post(
 router.post(
   '/auth/delete-account/confirm',
   authMiddleware,
+  otpVerifyLimiter,
   validate(DeleteAccountConfirmSchema),
   authEmailController.confirmDeleteAccount,
 )

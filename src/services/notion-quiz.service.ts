@@ -2,13 +2,14 @@ import { randomUUID } from 'crypto'
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 
-import { invokeQuizGenerator } from './invokeQuizGenerator'
-import notionService from './notionService'
-import { s3Client, s3BucketName } from './s3Client'
+import { s3Client, s3BucketName } from './clients/s3.client'
+import { invokeQuizGenerator } from './helpers/invokeQuizGenerator'
+import notionService from './notion.service'
 import { AppError } from '../helpers/AppError'
+import { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
 
-type GenerateQuizFromNotionInput = {
+export type GenerateQuizFromNotionInput = {
   userId: string
   pageIds: string[]
   title?: string
@@ -17,19 +18,30 @@ type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  folderId?: string
   apiKeyId?: string
+  model?: string
+  difficulty?: DifficultyType
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
+const CONCURRENT_NOTION_FETCHES = 5
 
 class NotionQuizService {
   async generateQuizFromNotionPage(input: GenerateQuizFromNotionInput) {
     try {
-      // 1. Fetch content from all pages in parallel
+      // 1. Fetch content from all pages with concurrency limit
       const uniquePageIds = [...new Set(input.pageIds)]
-      const pageContents = await Promise.all(
-        uniquePageIds.map((pageId) => notionService.getPageContent(input.userId, pageId)),
-      )
+      const pageContents: string[] = []
+
+      // Simple chunked processing to avoid firing too many parallel fetches
+      for (let i = 0; i < uniquePageIds.length; i += CONCURRENT_NOTION_FETCHES) {
+        const chunk = uniquePageIds.slice(i, i + CONCURRENT_NOTION_FETCHES)
+        const chunkResults = await Promise.all(
+          chunk.map((pageId) => notionService.getPageContent(input.userId, pageId)),
+        )
+        pageContents.push(...chunkResults)
+      }
 
       const notionContent = pageContents.filter((c) => c.trim().length > 0).join('\n\n---\n\n')
 
@@ -73,7 +85,10 @@ class NotionQuizService {
         timerDuration: input.timerDuration,
         type: input.type,
         questionCount: input.questionCount,
+        folderId: input.folderId,
         apiKeyId: input.apiKeyId,
+        difficulty: input.difficulty,
+        model: input.model,
       })
 
       return {

@@ -57,6 +57,7 @@ export const GenerateQuizSchema = z
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
+    folderId: z.string().uuid().optional(),
     difficulty: DifficultyTypeEnum.optional(),
 
     apiKeyId: z.uuid().optional(),
@@ -137,7 +138,7 @@ export const GetQuizzesSchema = z.object({
     .number()
     .int()
     .min(1, 'limit must be at least 1')
-    .max(100, 'limit must be at most 100')
+    .max(1000, 'limit must be at most 1000')
     .default(20),
   offset: z.coerce.number().int().min(0, 'offset must be a non-negative integer').default(0),
   search: z.string().trim().min(1).optional(),
@@ -145,30 +146,88 @@ export const GetQuizzesSchema = z.object({
   types: QuestionTypesFilter,
   /** Sort by creation date: newest first (default) or oldest first. */
   sort: z.enum(['newest', 'oldest']).default('newest'),
+  /** Exclude quizzes that are in a specific folder */
+  excludeFolderId: z.string().uuid().optional(),
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>
+
+export const GenerateQuizFromNotionSchema = z
+  .object({
+    userId: z.uuid(),
+    pageIds: z
+      .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
+      .transform((val) => (Array.isArray(val) ? val : [val])),
+
+    title: z.string().min(1).max(200).optional(),
+
+    userInstructions: z.string().max(1000).optional(),
+
+    isTimerEnabled: z.boolean().optional(),
+
+    timerDuration: z.coerce
+      .number()
+      .int()
+      .positive('timerDuration must be a positive integer')
+      .optional(),
+
+    type: QuestionTypeEnum.optional(),
+
+    questionCount: z.coerce.number().int().min(1).max(30).optional(),
+
+    folderId: z.uuid().optional(),
+    apiKeyId: z.uuid().optional(),
+    model: z.enum(SUPPORTED_MODELS).optional(),
+    difficulty: DifficultyTypeEnum.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isTimerEnabled && !data.timerDuration) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['timerDuration'],
+        message: 'timerDuration is required when isTimerEnabled is true',
+      })
+    }
+  })
+
+export type GenerateQuizFromNotionInput = z.infer<typeof GenerateQuizFromNotionSchema>
 
 export const SubmitQuizSchema = z.object({
   answers: z
     .array(
       z
         .object({
-          questionId: z.string().uuid(),
-          selectedOptionId: z.string().uuid().optional(),
+          questionId: z.uuid(),
+          selectedOptionId: z.uuid().optional(),
+          selectedOptionIds: z.array(z.uuid()).min(1).max(20).optional(),
           textAnswer: z.string().max(5000).optional(),
         })
         .superRefine((data, ctx) => {
-          if (!data.selectedOptionId && !data.textAnswer) {
+          const provided =
+            (data.selectedOptionId ? 1 : 0) +
+            (data.selectedOptionIds && data.selectedOptionIds.length > 0 ? 1 : 0) +
+            (data.textAnswer && data.textAnswer.trim().length > 0 ? 1 : 0)
+
+          if (provided !== 1) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: [],
-              message: 'Either selectedOptionId or textAnswer is required',
+              message: 'Provide exactly one of selectedOptionId, selectedOptionIds, or textAnswer',
+            })
+          }
+
+          if (
+            data.selectedOptionIds &&
+            new Set(data.selectedOptionIds).size !== data.selectedOptionIds.length
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['selectedOptionIds'],
+              message: 'selectedOptionIds must not contain duplicates',
             })
           }
         }),
     )
-    .min(1, 'At least one answer is required')
     .max(100, 'Too many answers submitted')
     .superRefine((answers, ctx) => {
       const seen = new Set<string>()

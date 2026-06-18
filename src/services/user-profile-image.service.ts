@@ -1,6 +1,6 @@
 import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
-import { s3BucketName, s3Client, s3Region } from './s3Client'
+import { s3BucketName, s3Client, s3Region } from './clients/s3.client'
 import { AppError } from '../helpers/AppError'
 import userProfile from '../models/userProfile.model'
 const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB

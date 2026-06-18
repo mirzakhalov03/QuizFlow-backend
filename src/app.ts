@@ -2,16 +2,19 @@ import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
-import logger from 'morgan'
+import morgan from 'morgan'
 import swaggerUi from 'swagger-ui-express'
 
+import { logger } from './config/logger'
 import { swaggerSpec } from './config/swagger'
 import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
+import { requestLogger } from './middlewares/requestLogger'
 import analyticsRoutes from './routes/analytics.routes'
 import authRoutes from './routes/auth.routes'
 import byokRoutes from './routes/byok.routes'
+import folderRoutes from './routes/folder.routes'
 import healthRoutes from './routes/health.routes'
 import integrationRoutes from './routes/integrations.routes'
 import quizRoutes from './routes/quiz.routes'
@@ -20,7 +23,12 @@ import userProfileRoutes from './routes/userProfile.routes'
 
 const app = express()
 
-app.use(logger('dev'))
+app.use(requestLogger)
+app.use(
+  morgan('dev', {
+    stream: { write: (message) => logger.http(message.trim()) },
+  }),
+)
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
@@ -39,6 +47,7 @@ app.use(integrationRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
+app.use(folderRoutes)
 app.use(byokRoutes)
 app.use(analyticsRoutes)
 

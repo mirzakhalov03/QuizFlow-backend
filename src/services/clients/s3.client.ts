@@ -1,6 +1,6 @@
 import { S3Client } from '@aws-sdk/client-s3'
 
-import { AppError } from '../helpers/AppError'
+import { AppError } from '../../helpers/AppError'
 
 const { AWS_REGION, AWS_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
 

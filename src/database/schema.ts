@@ -18,6 +18,7 @@ import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
+export const gradingStatusEnum = pgEnum('grading_status', ['complete', 'pending', 'failed'])
 export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
 
 export const users = pgTable('users', {
@@ -92,12 +93,32 @@ export const userApiKeys = pgTable('user_api_keys', {
 
 export const questionTypeEnum = pgEnum('question_type', QUESTION_TYPES)
 
+export const folders = pgTable(
+  'folders',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('folders_user_id_idx').on(table.userId),
+  }),
+)
+
 export const quizzes = pgTable('quizzes', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),
   title: text('title').notNull(),
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  folderId: uuid('folder_id').references(() => folders.id, { onDelete: 'set null' }),
   type: questionTypeEnum('type'),
   isPublic: boolean('is_public').notNull().default(false),
   shareToken: text('share_token')
@@ -162,7 +183,9 @@ export const userAnswers = pgTable(
     selectedOptionId: uuid('selected_option_id').references(() => questionOptions.id, {
       onDelete: 'cascade',
     }),
+    selectedOptionIds: jsonb('selected_option_ids').$type<string[]>(),
     textAnswer: text('text_answer'),
+    isCorrect: boolean('is_correct'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
       .defaultNow()
@@ -192,6 +215,7 @@ export const quizResults = pgTable(
     totalQuestions: integer('total_questions').notNull(),
     correctAnswers: integer('correct_answers').notNull(),
     wrongAnswers: integer('wrong_answers').notNull(),
+    gradingStatus: gradingStatusEnum('grading_status').notNull().default('complete'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
       .defaultNow()
@@ -216,6 +240,8 @@ export const quizJobs = pgTable(
     status: jobStatusEnum('status').notNull().default('pending'),
     requestId: text('request_id'),
     tokensUsed: jsonb('tokens_used'),
+    apiKeyId: uuid('api_key_id').references(() => userApiKeys.id, { onDelete: 'set null' }),
+    apiKeyName: text('api_key_name'),
     error: text('error'),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'date' })
@@ -237,9 +263,18 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   integrations: many(userIntegrations),
   apiKeys: many(userApiKeys),
   quizzes: many(quizzes),
+  folders: many(folders),
   answers: many(userAnswers),
   quizResults: many(quizResults),
   quizJobs: many(quizJobs),
+}))
+
+export const foldersRelations = relations(folders, ({ one, many }) => ({
+  user: one(users, {
+    fields: [folders.userId],
+    references: [users.id],
+  }),
+  quizzes: many(quizzes),
 }))
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -267,6 +302,10 @@ export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
   user: one(users, {
     fields: [quizzes.userId],
     references: [users.id],
+  }),
+  folder: one(folders, {
+    fields: [quizzes.folderId],
+    references: [folders.id],
   }),
   questions: many(questions),
   quizResults: many(quizResults),

@@ -1,11 +1,9 @@
 import OpenAI from 'openai'
 
-import { AppError } from '../helpers/AppError'
+import { logger } from '../../config/logger'
+import { AppError } from '../../helpers/AppError'
 
-export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
+export type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
 
 export type JsonSchema = {
   name: string
@@ -19,6 +17,8 @@ export type ChatJsonOptions = {
   schema: JsonSchema
   apiKey?: string
   temperature?: number
+  timeoutMs?: number
+  maxRetries?: number
 }
 
 const getClient = (apiKey?: string) => {
@@ -48,23 +48,37 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
 
   let completion: OpenAI.ChatCompletion
 
+  // Only set these when provided. The SDK validates `timeout` whenever the key
+  // is *present* (`'timeout' in options`), so passing `timeout: undefined`
+  // throws "timeout must be an integer" instead of falling back to the default.
+  const requestOptions: { timeout?: number; maxRetries?: number } = {}
+  if (options.timeoutMs !== undefined) requestOptions.timeout = options.timeoutMs
+  if (options.maxRetries !== undefined) requestOptions.maxRetries = options.maxRetries
+
   try {
-    completion = await client.chat.completions.create({
-      model: options.model,
-      temperature: options.temperature ?? 0.4,
-      messages: options.messages,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: options.schema.name,
-          strict: options.schema.strict ?? true,
-          schema: options.schema.schema,
+    completion = await client.chat.completions.create(
+      {
+        model: options.model,
+        temperature: options.temperature ?? 0.4,
+        messages: options.messages,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: options.schema.name,
+            strict: options.schema.strict ?? true,
+            schema: options.schema.schema,
+          },
         },
       },
-    })
+      requestOptions,
+    )
   } catch (err) {
     if (err instanceof OpenAI.APIError) {
-      console.error('[openRouter] error:', err.status, err.message, err.error)
+      logger.error('OpenRouter API error', {
+        status: err.status,
+        message: err.message,
+        error: err.error,
+      })
       throw new AppError(
         `OpenRouter request failed (${err.status})`,
         502,

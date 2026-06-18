@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm'
 import jwt from 'jsonwebtoken'
 
-import integrationService from './integrationService'
-import notionService from './notionService'
-import profileService from './profileService'
-import userService from './userService'
+import integrationService from './integration.service'
+import notionService from './notion.service'
+import profileService from './profile.service'
+import userService from './user.service'
 import { db } from '../database/database'
 import { users } from '../database/schema'
 import { AppError } from '../helpers/AppError'
@@ -54,6 +54,10 @@ class AuthService {
   }
   async storeRefreshToken(userId: string, token: string) {
     await db.update(users).set({ refreshToken: token }).where(eq(users.id, userId))
+  }
+
+  async clearRefreshToken(token: string) {
+    await db.update(users).set({ refreshToken: null }).where(eq(users.refreshToken, token))
   }
 
   private async exchangeGoogleCode(code: string) {

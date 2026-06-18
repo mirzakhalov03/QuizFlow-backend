@@ -1,13 +1,14 @@
 import { InvokeCommand, type InvokeCommandOutput } from '@aws-sdk/client-lambda'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
-import { lambdaClient } from './lambdaClient'
-import { db } from '../database/database'
-import { quizJobs } from '../database/schema'
-import { AppError } from '../helpers/AppError'
-import type { DifficultyType } from '../types/difficultyTypes'
-import type { QuestionType } from '../types/questionTypes'
-type QuizGeneratePayload = {
+import { db } from '../../database/database'
+import { quizJobs, userApiKeys } from '../../database/schema'
+import { AppError } from '../../helpers/AppError'
+import type { DifficultyType } from '../../types/difficultyTypes'
+import type { QuestionType } from '../../types/questionTypes'
+import { lambdaClient } from '../clients/lambda.client'
+
+export type QuizGeneratePayload = {
   userId: string
   bucket: string
   keys: string[]
@@ -20,6 +21,7 @@ type QuizGeneratePayload = {
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
+  folderId?: string
   apiKeyId?: string
 }
 
@@ -33,10 +35,25 @@ const markJobFailed = (jobId: string, error: string) =>
   db.update(quizJobs).set({ status: 'failed', error }).where(eq(quizJobs.id, jobId))
 
 export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
+  let apiKeyName: string | null = null
+  if (payload.apiKeyId) {
+    const keyRow = await db
+      .select({ keyName: userApiKeys.keyName })
+      .from(userApiKeys)
+      .where(and(eq(userApiKeys.id, payload.apiKeyId), eq(userApiKeys.userId, payload.userId)))
+      .limit(1)
+    apiKeyName = keyRow[0]?.keyName ?? 'Deleted Key'
+  }
+
   // 1. Create a job record in DB so the client can poll for it
   const [job] = await db
     .insert(quizJobs)
-    .values({ userId: payload.userId, status: 'pending' })
+    .values({
+      userId: payload.userId,
+      status: 'pending',
+      apiKeyId: payload.apiKeyId || null,
+      apiKeyName,
+    })
     .returning({ id: quizJobs.id })
 
   // 2. Fire the Lambda asynchronously — pass jobId so the handler can update the record
