@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { quizJobs, quizResults, quizzes } from '../database/schema'
@@ -24,6 +24,14 @@ export type QuizHistoryItem = {
   date: string
 }
 
+export type KeyUsageSummary = {
+  keyId: string | null
+  keyName: string
+  tokensUsed: number
+  quizCount: number
+  percentage: number
+}
+
 export type AnalyticsSummary = {
   totalQuizzesTaken: number
   averageScore: number
@@ -31,6 +39,7 @@ export type AnalyticsSummary = {
   breakdownByType: TypeBreakdown[]
   history: QuizHistoryItem[]
   totalTokensUsed: number
+  keyUsageBreakdown: KeyUsageSummary[]
 }
 
 const toPercent = (correct: number, total: number) => (total > 0 ? (correct / total) * 100 : 0)
@@ -54,17 +63,54 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   const tokenUsageRows = await db
     .select({
       tokensUsed: quizJobs.tokensUsed,
+      apiKeyId: quizJobs.apiKeyId,
+      apiKeyName: quizJobs.apiKeyName,
     })
     .from(quizJobs)
-    .where(eq(quizJobs.userId, userId))
+    .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done')))
 
   let totalTokensUsed = 0
+  const keyMap = new Map<
+    string,
+    { keyId: string | null; keyName: string; tokens: number; count: number }
+  >()
+
+  // Initialize Default Key
+  keyMap.set('system', { keyId: null, keyName: 'QuizFlow Default Key', tokens: 0, count: 0 })
+
   for (const row of tokenUsageRows) {
+    let tokens = 0
     if (row.tokensUsed && typeof row.tokensUsed === 'object') {
       const usage = row.tokensUsed as { total_tokens?: number }
-      totalTokensUsed += usage.total_tokens ?? 0
+      tokens = usage.total_tokens ?? 0
     }
+    totalTokensUsed += tokens
+
+    const isByok = !!row.apiKeyId
+    const keyKey = isByok ? row.apiKeyId! : 'system'
+    const keyLabel = isByok ? (row.apiKeyName ?? 'BYOK Key') : 'QuizFlow Default Key'
+
+    const entry = keyMap.get(keyKey) ?? {
+      keyId: row.apiKeyId,
+      keyName: keyLabel,
+      tokens: 0,
+      count: 0,
+    }
+    entry.tokens += tokens
+    entry.count += 1
+    keyMap.set(keyKey, entry)
   }
+
+  const keyUsageBreakdown: KeyUsageSummary[] = Array.from(keyMap.values())
+    .filter((k) => k.count > 0 || k.tokens > 0)
+    .map((k) => ({
+      keyId: k.keyId,
+      keyName: k.keyName,
+      tokensUsed: k.tokens,
+      quizCount: k.count,
+      percentage: totalTokensUsed > 0 ? round((k.tokens / totalTokensUsed) * 100) : 0,
+    }))
+    .sort((a, b) => b.tokensUsed - a.tokensUsed)
 
   if (quizRows.length === 0) {
     return {
@@ -74,6 +120,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       breakdownByType: [],
       history: [],
       totalTokensUsed,
+      keyUsageBreakdown,
     }
   }
 
@@ -136,5 +183,6 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     breakdownByType,
     history,
     totalTokensUsed,
+    keyUsageBreakdown,
   }
 }
