@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { folders, quizResults, quizzes } from '../database/schema'
@@ -48,24 +48,26 @@ export const getQuizHistory = async (
     .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
     .leftJoin(folders, eq(quizzes.folderId, folders.id))
     .where(
-      and(eq(quizResults.userId, userId), folderId ? eq(quizzes.folderId, folderId) : undefined),
+      and(
+        eq(quizResults.userId, userId),
+        gt(quizResults.totalQuestions, 0),
+        folderId ? eq(quizzes.folderId, folderId) : undefined,
+      ),
     )
     .orderBy(...orderBy)
     .limit(limit)
 
-  const items: HistoryItem[] = rows
-    .filter((r) => r.totalQuestions > 0)
-    .map((r) => ({
-      resultId: r.resultId,
-      quizId: r.quizId,
-      quizTitle: r.quizTitle,
-      folderId: r.folderId,
-      folderName: r.folderName,
-      score: Math.round((r.correctAnswers / r.totalQuestions) * 100 * 100) / 100,
-      correctAnswers: r.correctAnswers,
-      totalQuestions: r.totalQuestions,
-      completedAt: r.completedAt.toISOString(),
-    }))
+  const items: HistoryItem[] = rows.map((r) => ({
+    resultId: r.resultId,
+    quizId: r.quizId,
+    quizTitle: r.quizTitle,
+    folderId: r.folderId,
+    folderName: r.folderName,
+    score: Math.round((r.correctAnswers / r.totalQuestions) * 100 * 100) / 100,
+    correctAnswers: r.correctAnswers,
+    totalQuestions: r.totalQuestions,
+    completedAt: r.completedAt.toISOString(),
+  }))
 
   return { items }
 }
