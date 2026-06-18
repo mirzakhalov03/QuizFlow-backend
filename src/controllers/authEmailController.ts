@@ -35,7 +35,7 @@ const confirmRegistration = async (req: Request, res: Response, next: NextFuncti
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/dashboard`)
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }
@@ -49,7 +49,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     res.cookie('accessToken', accessToken, COOKIE_ACCESS_TOKEN_OPTIONS)
     res.cookie('refreshToken', refreshToken, COOKIE_REFRESH_TOKEN_OPTIONS)
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/dashboard`)
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }

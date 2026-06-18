@@ -1,47 +1,79 @@
+import 'dotenv/config'
+
+import { type Message } from '@aws-sdk/client-sqs'
+
 import { generateFeedbackForUser } from '../services/feedbackService'
-import { getRabbitMQChannel, FEEDBACK_QUEUE, FEEDBACK_DLQ, MAX_RETRIES } from '../services/rabbitmq'
+import { releaseFeedbackLock } from '../services/redis'
+import { receiveJob, deleteJob, getReceiveCount, MAX_RECEIVE_COUNT } from '../services/sqs'
+
+const ERROR_BACKOFF_MS = 5000
+
+let shuttingDown = false
+
+const handleMessage = async (msg: Message): Promise<void> => {
+  const receiveCount = getReceiveCount(msg)
+
+  let userId: string
+  try {
+    const parsed = JSON.parse(msg.Body ?? '{}') as { userId?: string }
+    if (!parsed.userId) throw new Error('missing userId')
+    userId = parsed.userId
+  } catch {
+    // Poison message — leave it undeleted so SQS dead-letters it after maxReceiveCount
+    console.error('[feedbackWorker] Malformed message, leaving for DLQ:', msg.MessageId)
+    return
+  }
+
+  console.log(
+    `[feedbackWorker] Processing userId=${userId} (attempt ${receiveCount}/${MAX_RECEIVE_COUNT})`,
+  )
+
+  try {
+    await generateFeedbackForUser(userId)
+    await deleteJob(msg.ReceiptHandle!) // ack — remove so it isn't redelivered
+    await releaseFeedbackLock(userId)
+    console.log(`[feedbackWorker] Done userId=${userId}`)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error(`[feedbackWorker] Failed userId=${userId}:`, errorMessage)
+
+    // Not deleting the message is what triggers a retry: after the queue's
+    // visibility timeout SQS makes it visible again and redelivers it.
+    if (receiveCount >= MAX_RECEIVE_COUNT) {
+      // Terminal — SQS will route it to the DLQ instead of redelivering.
+      console.error(
+        `[feedbackWorker] Max attempts reached for userId=${userId}, will be dead-lettered`,
+      )
+      await releaseFeedbackLock(userId)
+    }
+    // Otherwise keep the lock so the cron won't enqueue a duplicate before the retry.
+  }
+}
 
 const startFeedbackWorker = async (): Promise<void> => {
-  const channel = await getRabbitMQChannel()
-
-  // Process one message at a time
-  channel.prefetch(1)
-
   console.log('[feedbackWorker] Waiting for messages...')
 
-  channel.consume(FEEDBACK_QUEUE, async (msg) => {
-    if (!msg) return
-
-    const { userId } = JSON.parse(msg.content.toString()) as { userId: string }
-    const retryCount = (msg.properties.headers?.retryCount as number) ?? 0
-
-    console.log(
-      `[feedbackWorker] Processing userId=${userId} (attempt ${retryCount + 1}/${MAX_RETRIES})`,
-    )
-
+  while (!shuttingDown) {
     try {
-      await generateFeedbackForUser(userId)
-      channel.ack(msg)
-      console.log(`[feedbackWorker] Done userId=${userId}`)
+      const msg = await receiveJob()
+      if (msg) await handleMessage(msg)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error(`[feedbackWorker] Failed userId=${userId}:`, errorMessage)
-
-      if (retryCount < MAX_RETRIES - 1) {
-        // Requeue with incremented retry count
-        channel.nack(msg, false, false)
-        channel.sendToQueue(FEEDBACK_QUEUE, msg.content, {
-          persistent: true,
-          headers: { retryCount: retryCount + 1 },
-        })
-      } else {
-        // Max retries reached — send to DLQ
-        console.error(`[feedbackWorker] Max retries reached for userId=${userId}, sending to DLQ`)
-        channel.nack(msg, false, false)
-      }
+      console.error('[feedbackWorker] Receive loop error:', errorMessage)
+      // Back off so a persistent failure (e.g. AccessDenied) doesn't spin hot
+      await new Promise((resolve) => setTimeout(resolve, ERROR_BACKOFF_MS))
     }
-  })
+  }
+
+  console.log('[feedbackWorker] Shut down cleanly')
 }
+
+const shutdown = (signal: string): void => {
+  console.log(`[feedbackWorker] ${signal} received, finishing current poll...`)
+  shuttingDown = true
+}
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 startFeedbackWorker().catch((error) => {
   console.error('[feedbackWorker] Failed to start:', error)

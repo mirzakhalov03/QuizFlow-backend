@@ -43,9 +43,7 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7d — matches JWT expiry
     })
 
-    return res.redirect(
-      process.env.FRONTEND_URL + '/app/dashboard' || 'http://localhost:5173/app/dashboard',
-    )
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node ./src/server.ts\"",
+    "worker:dev": "nodemon --watch src --ext ts --exec \"ts-node ./src/workers/feedbackWorker.ts\"",
+    "worker:start": "node ./dist/src/workers/feedbackWorker.js",
     "build": "tsc",
     "build:lambda": "ts-node ./scripts/build-lambda.ts",
     "deploy:lambda": "ts-node ./scripts/deploy-lambda.ts",
@@ -28,11 +30,11 @@
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.895.0",
     "@aws-sdk/client-s3": "^3.895.0",
+    "@aws-sdk/client-sqs": "^3.1070.0",
     "@aws-sdk/s3-request-presigner": "^3.1041.0",
     "@notionhq/client": "^5.20.0",
     "@sentry/node": "^10.56.0",
     "adm-zip": "^0.5.16",
-    "amqplib": "^2.0.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "~1.4.4",
     "cors": "^2.8.6",
@@ -50,6 +52,7 @@
     "openai": "^6.38.0",
     "pdf2json": "^4.0.3",
     "pg": "^8.20.0",
+    "redis": "^6.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "zod": "^4.4.3"
@@ -59,7 +62,6 @@
     "@aws-sdk/client-rds": "^3.1045.0",
     "@eslint/js": "^9.39.4",
     "@types/adm-zip": "^0.5.7",
-    "@types/amqplib": "^0.10.8",
     "@types/bcryptjs": "^2.4.2",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
