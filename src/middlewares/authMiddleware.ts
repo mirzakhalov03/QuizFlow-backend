@@ -68,7 +68,7 @@ export const optionalAuthMiddleware = async (
   next: NextFunction,
 ) => {
   try {
-    const token = req.cookies.accessToken
+    const token = req.cookies?.accessToken
     if (!token) return next()
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as AuthTokenPayload
