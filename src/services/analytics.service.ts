@@ -289,7 +289,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     {
       folderId: null,
       folderName: 'All quizzes',
-      averageScore: round(allFolder.sum / allFolder.count),
+      averageScore: allFolder.count > 0 ? round(allFolder.sum / allFolder.count) : 0,
       bestScore: round(allFolder.best),
       attemptCount: allFolder.count,
     },
@@ -297,7 +297,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       .map(([key, acc]) => ({
         folderId: key === '' ? null : key,
         folderName: acc.folderName,
-        averageScore: round(acc.sum / acc.count),
+        averageScore: acc.count > 0 ? round(acc.sum / acc.count) : 0,
         bestScore: round(acc.best),
         attemptCount: acc.count,
       }))
@@ -309,7 +309,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       quizId,
       quizTitle: acc.quizTitle,
       folderId: acc.folderId,
-      averageScore: round(acc.sum / acc.count),
+      averageScore: acc.count > 0 ? round(acc.sum / acc.count) : 0,
       bestScore: round(acc.best),
       attemptCount: acc.count,
     }))
