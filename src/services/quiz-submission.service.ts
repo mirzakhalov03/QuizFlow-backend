@@ -316,7 +316,9 @@ export const submitQuiz = async (
 
 export type PublicReviewItem = {
   questionId: string
-  isCorrect: boolean
+  /** true/false = graded verdict; null = an answered open-ended we couldn't grade
+   *  (LLM outage) — dropped from the score, shown as "Not graded" rather than wrong. */
+  isCorrect: boolean | null
   /** Correct option ids for choice/true-false questions (empty for open-ended). */
   correctOptionIds: string[]
   /** Model answer text for open-ended questions only — never the rubric. */
@@ -457,12 +459,21 @@ export const submitPublicQuiz = async (
 
   const wrongAnswers = totalQuestions - correctAnswers
 
+  // True when grading threw for the whole batch (the denominator-drop case above).
+  // gradeOpenEndedBatch otherwise returns a verdict for every answered row, so a
+  // missing verdict only ever means total failure — never a partial result.
+  const openEndedGradingFailed = openEndedRows.length > 0 && openEndedVerdicts.size === 0
+
   const review: PublicReviewItem[] = quizQuestions.map((q) => {
     if (q.type === 'open_ended') {
       const correctOpt = optionRows.find((o) => o.questionId === q.id && o.isCorrect)
+      const answered = (answersByQuestion.get(q.id)?.textAnswer?.trim() ?? '').length > 0
       return {
         questionId: q.id,
-        isCorrect: openEndedVerdicts.get(q.id) ?? false,
+        // Answered open-ended we couldn't grade → null (ungraded), matching its
+        // removal from the score; everything else is its real verdict.
+        isCorrect:
+          openEndedGradingFailed && answered ? null : (openEndedVerdicts.get(q.id) ?? false),
         correctOptionIds: [],
         modelAnswer: correctOpt?.text ?? undefined,
       }
