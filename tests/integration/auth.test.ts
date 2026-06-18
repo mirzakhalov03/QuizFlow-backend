@@ -2,6 +2,7 @@ import request from 'supertest'
 import { describe, it, vi, beforeEach, expect } from 'vitest'
 
 import app from '../../src/app'
+import { AppError } from '../../src/helpers/AppError'
 import authService from '../../src/services/auth.service'
 
 vi.mock('../../src/services/auth.service')
@@ -27,7 +28,9 @@ describe('Auth Integration Tests', () => {
     })
 
     it('should return 401 when service throws error', async () => {
-      vi.mocked(authService.refreshAccessToken).mockRejectedValue(new AppError('Invalid token', 401))
+      vi.mocked(authService.refreshAccessToken).mockRejectedValue(
+        new AppError('Invalid token', 401),
+      )
 
       const response = await request(app)
         .post('/auth/refresh')

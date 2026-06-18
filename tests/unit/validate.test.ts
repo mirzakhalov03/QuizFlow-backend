@@ -1,6 +1,5 @@
-import { expect } from 'chai'
 import { type NextFunction, type Request, type Response } from 'express'
-import { describe, it, vi, beforeEach } from 'vitest'
+import { describe, it, vi, beforeEach, expect } from 'vitest'
 import { z } from 'zod'
 
 import { validate } from '../../src/middlewares/validate'
@@ -35,12 +34,13 @@ describe('validate Middleware', () => {
 
     validate(schema)(mockReq as Request, mockRes as Response, mockNext)
 
-    expect(vi.mocked(mockRes.status).mock.calls[0][0]).to.equal(400)
-    expect(vi.mocked(mockRes.json).mock.calls[0][0]).to.have.property('success', false)
-    expect(vi.mocked(mockRes.json).mock.calls[0][0]).to.have.property(
-      'message',
-      'Validation failed',
+    expect(mockRes.status).toHaveBeenCalledWith(400)
+    expect(mockRes.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        message: 'Validation failed',
+      }),
     )
-    expect(vi.mocked(mockNext).mock.calls.length).to.equal(0)
+    expect(mockNext).not.toHaveBeenCalled()
   })
 })

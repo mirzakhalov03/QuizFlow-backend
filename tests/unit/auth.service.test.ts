@@ -1,6 +1,5 @@
-import { expect } from 'chai'
 import jwt from 'jsonwebtoken'
-import { describe, it, vi, beforeEach } from 'vitest'
+import { describe, it, vi, beforeEach, expect } from 'vitest'
 
 import { AppError } from '../../src/helpers/AppError'
 import User from '../../src/models/user.model'
@@ -29,24 +28,14 @@ describe('AuthService', () => {
 
   describe('refreshAccessToken', () => {
     it('should throw error if no refreshToken provided', async () => {
-      try {
-        await authService.refreshAccessToken('')
-        expect.fail('Should have thrown an error')
-      } catch (error) {
-        expect((error as Error).message).to.equal('No refresh token')
-      }
+      await expect(authService.refreshAccessToken('')).rejects.toThrow('No refresh token')
     })
 
     it('should throw AppError if user not found', async () => {
       const token = jwt.sign({ id: 'user-1' }, 'test-refresh-secret')
       vi.mocked(User.findById).mockResolvedValue(null)
 
-      try {
-        await authService.refreshAccessToken(token)
-        expect.fail('Should have thrown AppError')
-      } catch (error) {
-        expect(error).to.be.instanceOf(AppError)
-      }
+      await expect(authService.refreshAccessToken(token)).rejects.toThrow(AppError)
     })
 
     it('should throw AppError if refreshToken does not match', async () => {
@@ -54,12 +43,7 @@ describe('AuthService', () => {
       const mockUser = { id: 'user-1', refreshToken: 'different-token' }
       vi.mocked(User.findById).mockResolvedValue(mockUser as unknown as User)
 
-      try {
-        await authService.refreshAccessToken(token)
-        expect.fail('Should have thrown AppError')
-      } catch (error) {
-        expect(error).to.be.instanceOf(AppError)
-      }
+      await expect(authService.refreshAccessToken(token)).rejects.toThrow(AppError)
     })
 
     it('should return new accessToken if valid', async () => {
@@ -68,7 +52,7 @@ describe('AuthService', () => {
       vi.mocked(User.findById).mockResolvedValue(mockUser as unknown as User)
 
       const accessToken = await authService.refreshAccessToken(token)
-      expect(accessToken).to.be.a('string')
+      expect(typeof accessToken).toBe('string')
     })
   })
 })
