@@ -27,13 +27,13 @@ describe('Auth Integration Tests', () => {
     })
 
     it('should return 401 when service throws error', async () => {
-      vi.mocked(authService.refreshAccessToken).mockRejectedValue(new Error('Invalid token'))
+      vi.mocked(authService.refreshAccessToken).mockRejectedValue(new AppError('Invalid token', 401))
 
       const response = await request(app)
         .post('/auth/refresh')
         .set('Cookie', ['refreshToken=invalid-token'])
 
-      expect(response.status).toBe(500)
+      expect(response.status).toBe(401)
     })
   })
 
