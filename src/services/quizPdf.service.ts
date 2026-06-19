@@ -38,7 +38,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function renderQuestion(question: PdfQuestion, index: number): string {
+function renderQuestion(question: PdfQuestion, index: number, withAnswers = true): string {
   const typeLabel = TYPE_LABEL[question.type] ?? question.type
 
   if (question.type === 'open_ended') {
@@ -53,7 +53,7 @@ function renderQuestion(question: PdfQuestion, index: number): string {
         </div>
         <div class="answer-lines"></div>
         ${
-          suggestedText
+          withAnswers && suggestedText
             ? `<div class="suggested"><span class="suggested-label">Suggested answer</span>${escapeHtml(
                 suggestedText,
               )}</div>`
@@ -64,11 +64,12 @@ function renderQuestion(question: PdfQuestion, index: number): string {
 
   const options = question.options
     .map((option) => {
-      const correctClass = option.isCorrect ? ' option--correct' : ''
-      const marker = option.isCorrect ? '✓' : ''
-      const explanation = option.explanation
-        ? `<div class="explanation">${escapeHtml(option.explanation)}</div>`
-        : ''
+      const correctClass = withAnswers && option.isCorrect ? ' option--correct' : ''
+      const marker = withAnswers && option.isCorrect ? '✓' : ''
+      const explanation =
+        withAnswers && option.explanation
+          ? `<div class="explanation">${escapeHtml(option.explanation)}</div>`
+          : ''
       return `
         <li class="option${correctClass}">
           <span class="option-marker">${marker}</span>
@@ -96,8 +97,8 @@ function renderQuestion(question: PdfQuestion, index: number): string {
  * so Puppeteer can render it without loading external assets. The PDF is an
  * answer key: correct options are marked and explanations are included.
  */
-export function buildQuizHtml(quiz: PdfQuiz): string {
-  const questions = quiz.questions.map((q, i) => renderQuestion(q, i)).join('')
+export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
+  const questions = quiz.questions.map((q, i) => renderQuestion(q, i, withAnswers)).join('')
   const meta = quiz.difficulty
     ? `<p class="meta">Difficulty: ${escapeHtml(quiz.difficulty)} · ${quiz.questions.length} questions</p>`
     : `<p class="meta">${quiz.questions.length} questions</p>`
@@ -176,11 +177,11 @@ async function getBrowser() {
 }
 
 /** Render the quiz HTML to a PDF buffer using headless Chromium. */
-export async function generateQuizPdf(quiz: PdfQuiz): Promise<Buffer> {
+export async function generateQuizPdf(quiz: PdfQuiz, withAnswers = true): Promise<Buffer> {
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
-    await page.setContent(buildQuizHtml(quiz), { waitUntil: 'domcontentloaded' })
+    await page.setContent(buildQuizHtml(quiz, withAnswers), { waitUntil: 'domcontentloaded' })
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
