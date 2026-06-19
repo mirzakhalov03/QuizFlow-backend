@@ -38,6 +38,19 @@ export const authLimiter = rateLimit({
   handler: buildAuthHandler(),
 })
 
+// Public, unauthenticated quiz submit triggers a paid LLM call for open-ended
+// grading — cap by normalized IP to bound cost/abuse.
+export const publicSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.ip ? ipKeyGenerator(req.ip) : 'anonymous'),
+  handler: (_req, _res, next) => {
+    next(new AppError('Too many submissions, please try again later.', 429, 'RATE_LIMITED'))
+  },
+})
+
 // Tighter protection on code/token verification (brute-force targets).
 // Keyed by IP + identifier (email from body, else authenticated userId).
 export const otpVerifyLimiter = rateLimit({
