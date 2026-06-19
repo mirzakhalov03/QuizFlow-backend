@@ -246,3 +246,10 @@ export const SubmitQuizSchema = z.object({
 })
 
 export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>
+
+export const PublicSubmitSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(60),
+  answers: SubmitQuizSchema.shape.answers,
+})
+
+export type PublicSubmitInput = z.infer<typeof PublicSubmitSchema>

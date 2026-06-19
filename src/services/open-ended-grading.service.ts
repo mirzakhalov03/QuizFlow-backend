@@ -82,6 +82,56 @@ const finalizeScore = async (
     .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
 }
 
+export type OpenEndedGradeRow = {
+  questionId: string
+  questionText: string
+  modelAnswer: string
+  rubric: string | null
+  userText: string
+}
+
+/**
+ * Pure open-ended grading: one batched LLM call, returns a verdict per question
+ * keyed by questionId. No DB access — the caller decides whether to persist the
+ * verdicts (authed path) or use them ephemerally (public path). Throws on LLM
+ * failure/timeout so the caller can choose how to degrade. Verdicts map back by
+ * 1-based prompt index; a missing index defaults to incorrect.
+ */
+export const gradeOpenEndedBatch = async (
+  rows: OpenEndedGradeRow[],
+): Promise<Map<string, boolean>> => {
+  if (rows.length === 0) return new Map()
+
+  const userContent = rows
+    .map((r, i) =>
+      [
+        `Question ${i + 1}:`,
+        `Q: ${r.questionText}`,
+        `Model answer: ${r.modelAnswer}`,
+        `Rubric: ${r.rubric ?? 'n/a'}`,
+        `Student answer: ${r.userText}`,
+      ].join('\n'),
+    )
+    .join('\n\n')
+
+  const { data } = await chatJSON<LlmGrades>({
+    model: DEFAULT_MODEL,
+    schema: GRADE_SCHEMA,
+    temperature: 0,
+    timeoutMs: GRADING_TIMEOUT_MS,
+    maxRetries: 1,
+    messages: [
+      { role: 'system', content: OPEN_ENDED_GRADING_SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ],
+  })
+
+  const verdictByIndex = new Map(data.grades.map((g) => [g.index, g.isCorrect]))
+  const result = new Map<string, boolean>()
+  rows.forEach((r, i) => result.set(r.questionId, verdictByIndex.get(i + 1) ?? false))
+  return result
+}
+
 export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Promise<void> => {
   // Count auto-gradable questions so we can shrink the denominator on failure.
   const allQuestions = await db
@@ -122,43 +172,23 @@ export const gradeOpenEndedAnswers = async (quizId: string, userId: string): Pro
   }
 
   try {
-    const userContent = answered
-      .map((r, i) =>
-        [
-          `Question ${i + 1}:`,
-          `Q: ${r.questionText}`,
-          `Model answer: ${r.modelAnswer}`,
-          `Rubric: ${r.rubric ?? 'n/a'}`,
-          `Student answer: ${r.userText}`,
-        ].join('\n'),
-      )
-      .join('\n\n')
-
-    const { data } = await chatJSON<LlmGrades>({
-      model: DEFAULT_MODEL,
-      schema: GRADE_SCHEMA,
-      temperature: 0,
-      timeoutMs: GRADING_TIMEOUT_MS,
-      maxRetries: 1,
-      messages: [
-        { role: 'system', content: OPEN_ENDED_GRADING_SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
-    })
-
-    // Map verdicts back by 1-based prompt index — robust against the model not
-    // echoing identifiers. A missing index defaults to incorrect.
-    const verdictByIndex = new Map(data.grades.map((g) => [g.index, g.isCorrect]))
+    const verdicts = await gradeOpenEndedBatch(
+      answered.map((r) => ({
+        questionId: r.questionId,
+        questionText: r.questionText,
+        modelAnswer: r.modelAnswer,
+        rubric: r.rubric,
+        userText: r.userText ?? '',
+      })),
+    )
 
     await db.transaction(async (tx) => {
-      for (let i = 0; i < answered.length; i++) {
-        const isCorrect = verdictByIndex.get(i + 1) ?? false
+      for (const r of answered) {
+        const isCorrect = verdicts.get(r.questionId) ?? false
         await tx
           .update(userAnswers)
           .set({ isCorrect })
-          .where(
-            and(eq(userAnswers.questionId, answered[i].questionId), eq(userAnswers.userId, userId)),
-          )
+          .where(and(eq(userAnswers.questionId, r.questionId), eq(userAnswers.userId, userId)))
       }
 
       await finalizeScore(tx, quizId, userId)
