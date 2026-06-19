@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import {
   gradeOpenEndedAnswers,
@@ -149,8 +149,8 @@ export const submitQuiz = async (
     return null
   }
 
-  // Keep only the first answer per question. A client could send duplicates,
-  // and (userId, questionId) is unique — duplicates would break the insert below.
+  // Keep only the first answer per question. A client could send duplicates
+  // (e.g. a retry from two tabs), and we want one row per question per attempt.
   const seenQuestionIds = new Set<string>()
   const answers = rawAnswers.filter((answer) => {
     if (seenQuestionIds.has(answer.questionId)) return false
@@ -233,8 +233,8 @@ export const submitQuiz = async (
   const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
 
   const result = await db.transaction(async (tx) => {
-    // Record a result for every question in the quiz, ensuring that unanswered
-    // questions are explicitly marked as incorrect.
+    // user_answers stays one row per (user, question) — answer detail tracks
+    // the latest attempt, while score per attempt is preserved in quiz_results.
     const answerValues = quizQuestions.map((q) => {
       const answer = answersByQuestion.get(q.id)
       return {
@@ -248,12 +248,6 @@ export const submitQuiz = async (
       }
     })
 
-    // This submission is the authoritative attempt. We upsert a row for every
-    // question in the quiz (answered or not), so questions left unanswered now
-    // overwrite any stale answer/verdict from an earlier submission. Upserting
-    // (rather than delete-then-insert) keeps a concurrent double-submit — e.g.
-    // two tabs, or a retry — from racing on the (userId, questionId) unique
-    // constraint and 500ing.
     if (answerValues.length > 0) {
       await tx
         .insert(userAnswers)
@@ -270,6 +264,7 @@ export const submitQuiz = async (
         })
     }
 
+    // Append a new attempt rather than upserting — drives History + multi-attempt analytics.
     const [resultRow] = await tx
       .insert(quizResults)
       .values({
@@ -279,10 +274,6 @@ export const submitQuiz = async (
         correctAnswers,
         wrongAnswers,
         gradingStatus,
-      })
-      .onConflictDoUpdate({
-        target: [quizResults.userId, quizResults.quizId],
-        set: { totalQuestions, correctAnswers, wrongAnswers, gradingStatus },
       })
       .returning()
 
@@ -300,12 +291,12 @@ export const submitQuiz = async (
   // status to 'complete'/'failed' (bounded by a 30s LLM timeout), so this
   // never throws; we just re-read the row it updated in place.
   if (gradingStatus === 'pending') {
-    await gradeOpenEndedAnswers(quizId, userId)
+    await gradeOpenEndedAnswers(result.id, quizId, userId)
 
     const [finalized] = await db
       .select()
       .from(quizResults)
-      .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+      .where(eq(quizResults.id, result.id))
       .limit(1)
 
     if (finalized) return finalized
@@ -502,6 +493,7 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     })
     .from(quizResults)
     .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
+    .orderBy(desc(quizResults.createdAt))
     .limit(1)
 
   if (!result) {
@@ -509,8 +501,8 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     return null
   }
 
-  // One pass over the user's stored answers yields both the per-answer verdicts
-  // (graded open-ended) and the raw answers used to rebuild the review on refresh.
+  // user_answers is one row per (user, question) — these are always the latest
+  // submission's answers regardless of how many attempts exist in quiz_results.
   const answerRows = await db
     .select({
       questionId: userAnswers.questionId,

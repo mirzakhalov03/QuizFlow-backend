@@ -2,18 +2,20 @@ import { and, eq } from 'drizzle-orm'
 
 import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
-import { quizJobs, quizResults, quizzes } from '../database/schema'
+import { folders, quizJobs, quizResults, quizzes } from '../database/schema'
+import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
 
 export type ScorePoint = {
   date: string
   score: number
+  quizId: string
+  quizTitle: string
 }
 
 export type TypeBreakdown = {
   type: QuestionType
   quizCount: number
-  averageScore: number
 }
 
 export type QuizHistoryItem = {
@@ -23,6 +25,24 @@ export type QuizHistoryItem = {
   totalQuestions: number
   score: number
   date: string
+}
+
+/** Folder rollup. The synthetic 'all' entry sits first and covers every quiz. */
+export type FolderStat = {
+  folderId: string | null
+  folderName: string
+  averageScore: number
+  bestScore: number
+  attemptCount: number
+}
+
+export type QuizStat = {
+  quizId: string
+  quizTitle: string
+  folderId: string | null
+  averageScore: number
+  bestScore: number
+  attemptCount: number
 }
 
 export type KeyUsageSummary = {
@@ -44,7 +64,9 @@ export type AnalyticsSummary = {
   totalQuizzesTaken: number
   averageScore: number
   scoreOverTime: ScorePoint[]
-  breakdownByType: TypeBreakdown[]
+  typeBreakdown: TypeBreakdown[]
+  folderStats: FolderStat[]
+  quizStats: QuizStat[]
   history: QuizHistoryItem[]
   totalTokensUsed: number
   keyUsageBreakdown: KeyUsageSummary[]
@@ -64,9 +86,12 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       totalQuestions: quizResults.totalQuestions,
       correctAnswers: quizResults.correctAnswers,
       quizType: quizzes.type,
+      folderId: quizzes.folderId,
+      folderName: folders.name,
     })
     .from(quizResults)
     .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
+    .leftJoin(folders, eq(quizzes.folderId, folders.id))
     .where(eq(quizResults.userId, userId))
 
   const tokenUsageRows = await db
@@ -150,12 +175,25 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }))
     .sort((a, b) => b.tokensUsed - a.tokensUsed)
 
+  // Always send all 4 type slices so the pie chart can zero-fill empties.
+  const emptyTypeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({ type, quizCount: 0 }))
+
   if (quizRows.length === 0) {
     return {
       totalQuizzesTaken: 0,
       averageScore: 0,
       scoreOverTime: [],
-      breakdownByType: [],
+      typeBreakdown: emptyTypeBreakdown,
+      folderStats: [
+        {
+          folderId: null,
+          folderName: 'All quizzes',
+          averageScore: 0,
+          bestScore: 0,
+          attemptCount: 0,
+        },
+      ],
+      quizStats: [],
       history: [],
       totalTokensUsed,
       keyUsageBreakdown,
@@ -165,9 +203,23 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
 
   let gradedScoreSum = 0
   let gradedCount = 0
-  const byDay = new Map<string, { sum: number; count: number }>()
-  const byType = new Map<QuestionType, { sum: number; count: number }>()
   const history: QuizHistoryItem[] = []
+  const scoreOverTime: ScorePoint[] = []
+
+  type FolderAcc = { folderName: string; sum: number; best: number; count: number }
+  type QuizAcc = {
+    quizTitle: string
+    folderId: string | null
+    sum: number
+    best: number
+    count: number
+  }
+  // Synthetic "all" bucket stays first in the folderStats output.
+  const allFolder: FolderAcc = { folderName: 'All quizzes', sum: 0, best: 0, count: 0 }
+  // folderId may be null (root). Key the map by '' for null so it slots in cleanly.
+  const folderAccs = new Map<string, FolderAcc>()
+  const quizAccs = new Map<string, QuizAcc>()
+  const seenQuizTypes = new Map<string, QuestionType>()
 
   for (const r of quizRows) {
     if (r.totalQuestions <= 0) continue
@@ -185,33 +237,83 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       date: r.createdAt.toISOString(),
     })
 
-    const date = r.createdAt.toISOString().slice(0, 10)
-    const dayEntry = byDay.get(date) ?? { sum: 0, count: 0 }
-    dayEntry.sum += percent
-    dayEntry.count += 1
-    byDay.set(date, dayEntry)
+    scoreOverTime.push({
+      date: r.createdAt.toISOString(),
+      score: round(percent),
+      quizId: r.quizId,
+      quizTitle: r.quizTitle,
+    })
 
-    if (r.quizType) {
-      const typeEntry = byType.get(r.quizType) ?? { sum: 0, count: 0 }
-      typeEntry.sum += percent
-      typeEntry.count += 1
-      byType.set(r.quizType, typeEntry)
+    allFolder.sum += percent
+    allFolder.count += 1
+    if (percent > allFolder.best) allFolder.best = percent
+
+    const folderKey = r.folderId ?? ''
+    const folderName = r.folderId ? (r.folderName ?? 'Unnamed folder') : 'Root'
+    const folderAcc = folderAccs.get(folderKey) ?? { folderName, sum: 0, best: 0, count: 0 }
+    folderAcc.sum += percent
+    folderAcc.count += 1
+    if (percent > folderAcc.best) folderAcc.best = percent
+    folderAccs.set(folderKey, folderAcc)
+
+    const quizAcc = quizAccs.get(r.quizId) ?? {
+      quizTitle: r.quizTitle,
+      folderId: r.folderId ?? null,
+      sum: 0,
+      best: 0,
+      count: 0,
     }
+    quizAcc.sum += percent
+    quizAcc.count += 1
+    if (percent > quizAcc.best) quizAcc.best = percent
+    quizAccs.set(r.quizId, quizAcc)
+
+    if (r.quizType) seenQuizTypes.set(r.quizId, r.quizType)
   }
 
   const averageScore = gradedCount > 0 ? gradedScoreSum / gradedCount : 0
 
-  const scoreOverTime: ScorePoint[] = Array.from(byDay.entries())
-    .map(([date, { sum, count }]) => ({ date, score: round(sum / count) }))
-    .sort((a, b) => a.date.localeCompare(b.date))
+  scoreOverTime.sort((a, b) => a.date.localeCompare(b.date))
 
-  const breakdownByType: TypeBreakdown[] = Array.from(byType.entries()).map(
-    ([type, { sum, count }]) => ({
-      type,
-      quizCount: count,
-      averageScore: round(sum / count),
-    }),
-  )
+  // Count distinct quizzes per type so the pie reflects library composition.
+  const typeCounts = new Map<QuestionType, number>()
+  for (const type of seenQuizTypes.values()) {
+    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1)
+  }
+  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({
+    type,
+    quizCount: typeCounts.get(type) ?? 0,
+  }))
+
+  const folderStats: FolderStat[] = [
+    {
+      folderId: null,
+      folderName: 'All quizzes',
+      averageScore: allFolder.count > 0 ? round(allFolder.sum / allFolder.count) : 0,
+      bestScore: round(allFolder.best),
+      attemptCount: allFolder.count,
+    },
+    ...Array.from(folderAccs.entries())
+      .map(([key, acc]) => ({
+        folderId: key === '' ? null : key,
+        folderName: acc.folderName,
+        averageScore: acc.count > 0 ? round(acc.sum / acc.count) : 0,
+        bestScore: round(acc.best),
+        attemptCount: acc.count,
+      }))
+      .sort((a, b) => b.attemptCount - a.attemptCount),
+  ]
+
+  const quizStats: QuizStat[] = Array.from(quizAccs.entries())
+    .map(([quizId, acc]) => ({
+      quizId,
+      quizTitle: acc.quizTitle,
+      folderId: acc.folderId,
+      averageScore: acc.count > 0 ? round(acc.sum / acc.count) : 0,
+      bestScore: round(acc.best),
+      attemptCount: acc.count,
+    }))
+    .sort((a, b) => b.attemptCount - a.attemptCount)
 
   history.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
@@ -219,7 +321,9 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     totalQuizzesTaken: gradedCount,
     averageScore: round(averageScore),
     scoreOverTime,
-    breakdownByType,
+    typeBreakdown,
+    folderStats,
+    quizStats,
     history,
     totalTokensUsed,
     keyUsageBreakdown,
