@@ -17,7 +17,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "validate": "npm run format && npm run lint:fix && npm run prepare"
+    "validate": "npm run format && npm run lint:fix && npm run prepare",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:int": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage"
   },
   "lint-staged": {
     "*.ts": [
@@ -63,8 +69,10 @@
     "@aws-sdk/client-ec2": "^3.1045.0",
     "@aws-sdk/client-rds": "^3.1045.0",
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.0",
     "@types/adm-zip": "^0.5.7",
     "@types/bcryptjs": "^2.4.2",
+    "@types/chai": "^5.2.3",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/debug": "^4.1.13",
@@ -76,8 +84,11 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.7",
     "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.9",
+    "chai": "^6.2.2",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.0",
@@ -89,8 +100,10 @@
     "lint-staged": "^16.4.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.8.3",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2"
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^4.1.9"
   }
 }

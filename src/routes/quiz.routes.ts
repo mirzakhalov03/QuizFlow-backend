@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import {
+  cloneSharedQuizController,
   deleteQuizByIdController,
   disableSharingController,
   enableSharingController,
@@ -12,16 +13,18 @@ import {
   getQuizResultController,
   getQuizzesController,
   patchQuizByIdController,
+  submitPublicQuizController,
   submitQuizController,
 } from '../controllers/quizController'
-import { authMiddleware } from '../middlewares/authMiddleware'
-import { quizGenerationLimiter } from '../middlewares/rateLimit'
+import { authMiddleware, optionalAuthMiddleware } from '../middlewares/authMiddleware'
+import { publicSubmitLimiter, quizGenerationLimiter } from '../middlewares/rateLimit'
 import { validate, validateQuery } from '../middlewares/validate'
 import {
   GenerateQuizSchema,
   GenerateQuizSourceSchema,
   GetQuizzesSchema,
   PatchQuizSchema,
+  PublicSubmitSchema,
   SubmitQuizSchema,
 } from '../validators/quiz.schema'
 
@@ -224,7 +227,31 @@ router.get('/quizzes/:id/pdf', authMiddleware, exportQuizPdfController)
  *      404:
  *        description: Quiz not found or not public
  */
-router.get('/public/quizzes/:shareToken', getPublicQuizController)
+router.get('/public/quizzes/:shareToken', optionalAuthMiddleware, getPublicQuizController)
+
+/**
+ * @openapi
+ * /public/quizzes/{shareToken}/submit:
+ *   post:
+ *     tags: [Quiz]
+ *     summary: Submit answers to a public quiz and get an ephemeral score (no auth)
+ */
+router.post(
+  '/public/quizzes/:shareToken/submit',
+  publicSubmitLimiter,
+  validate(PublicSubmitSchema),
+  submitPublicQuizController,
+)
+
+/**
+ * @openapi
+ * /quizzes/{shareToken}/clone:
+ *   post:
+ *     tags: [Quiz]
+ *     security: [{ cookieAuth: [] }]
+ *     summary: Clone a public quiz into the authenticated user's library
+ */
+router.post('/quizzes/:shareToken/clone', authMiddleware, cloneSharedQuizController)
 /**
  * @openapi
  * /quizzes/{id}:

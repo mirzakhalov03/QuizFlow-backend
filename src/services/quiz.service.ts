@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, ilike, inArray, sql, or, isNull, ne } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { folders, questionOptions, questions, quizJobs, quizzes } from '../database/schema'
+import { folders, questionOptions, questions, quizJobs, quizzes, users } from '../database/schema'
 import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
 type GetQuizzesParams = {
@@ -55,6 +55,8 @@ export const getQuizzes = async ({
       userId: quizzes.userId,
       folderId: quizzes.folderId,
       type: quizzes.type,
+      isPublic: quizzes.isPublic,
+      shareToken: quizzes.shareToken,
       properties: quizzes.properties,
       isTimerEnabled: quizzes.isTimerEnabled,
       timerDuration: quizzes.timerDuration,
@@ -172,13 +174,25 @@ export const getJobById = async (jobId: string, userId: string) => {
   return job ?? null
 }
 
-export const getPublicQuizByToken = async (shareToken: string) => {
-  // Single round-trip (see getQuizById). Public consumers must never see the
-  // answer key, so option columns are restricted to the safe four — no
-  // `isCorrect`, no `explanation` rubric. This projection is load-bearing.
+export const getPublicQuizByToken = async (shareToken: string, viewerId?: string) => {
+  // Single round-trip. Public consumers must never see the answer key, so option
+  // columns are restricted to the safe four — no `isCorrect`, no `explanation`.
+  // The quiz projection is likewise narrowed: never leak `userId` or `properties`
+  // (which holds the source S3 bucket/key). We expose only the owner's display
+  // name for attribution. This projection is load-bearing.
   const rows = await db
     .select({
-      quiz: quizzes,
+      quiz: {
+        id: quizzes.id,
+        title: quizzes.title,
+        userInstructions: quizzes.userInstructions,
+        type: quizzes.type,
+        isTimerEnabled: quizzes.isTimerEnabled,
+        timerDuration: quizzes.timerDuration,
+      },
+      // Used only to derive `isOwner` below; never spread into the response.
+      ownerId: quizzes.userId,
+      ownerName: users.fullName,
       question: questions,
       option: {
         id: questionOptions.id,
@@ -188,6 +202,7 @@ export const getPublicQuizByToken = async (shareToken: string) => {
       },
     })
     .from(quizzes)
+    .leftJoin(users, eq(users.id, quizzes.userId))
     .leftJoin(questions, eq(questions.quizId, quizzes.id))
     .leftJoin(questionOptions, eq(questionOptions.questionId, questions.id))
     .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
@@ -211,7 +226,14 @@ export const getPublicQuizByToken = async (shareToken: string) => {
     if (row.option && row.option.id !== null) q.options.push(row.option as PublicOption)
   }
 
-  return { ...rows[0].quiz, questions: [...questionsById.values()] }
+  return {
+    ...rows[0].quiz,
+    // True only for the authenticated owner — lets the frontend redirect them to
+    // their own (full-featured) copy instead of the read-only public view.
+    isOwner: viewerId != null && rows[0].ownerId === viewerId,
+    owner: { fullName: rows[0].ownerName ?? 'A QuizFlow user' },
+    questions: [...questionsById.values()],
+  }
 }
 
 export const setQuizSharing = async (id: string, userId: string, isPublic: boolean) => {
@@ -232,4 +254,89 @@ export const setQuizSharing = async (id: string, userId: string, isPublic: boole
     })
 
   return updatedQuiz ?? null
+}
+
+/**
+ * Copies a public quiz (its questions + options) into a brand-new quiz owned by
+ * `userId`. The clone is private (isPublic=false, fresh shareToken auto-assigned
+ * by the column default), unfiled, and not yet completed. Source S3 references in
+ * `properties` are intentionally dropped. Returns null if the token is not public.
+ */
+export const cloneSharedQuiz = async (shareToken: string, userId: string) => {
+  const [source] = await db
+    .select()
+    .from(quizzes)
+    .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
+    .limit(1)
+
+  if (!source) return null
+
+  const sourceQuestions = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.quizId, source.id))
+    .orderBy(asc(questions.position))
+
+  const questionIds = sourceQuestions.map((q) => q.id)
+  const sourceOptions =
+    questionIds.length > 0
+      ? await db
+          .select()
+          .from(questionOptions)
+          .where(inArray(questionOptions.questionId, questionIds))
+          .orderBy(asc(questionOptions.position))
+      : []
+
+  const optionsByQuestion = new Map<string, typeof sourceOptions>()
+  for (const o of sourceOptions) {
+    const arr = optionsByQuestion.get(o.questionId) ?? []
+    arr.push(o)
+    optionsByQuestion.set(o.questionId, arr)
+  }
+
+  const newQuizId = await db.transaction(async (tx) => {
+    const [newQuiz] = await tx
+      .insert(quizzes)
+      .values({
+        title: source.title,
+        userId,
+        type: source.type,
+        difficulty: source.difficulty,
+        isPublic: false,
+        properties: { generatedBy: 'clone' },
+        isTimerEnabled: source.isTimerEnabled,
+        timerDuration: source.timerDuration,
+        userInstructions: source.userInstructions,
+      })
+      .returning({ id: quizzes.id })
+
+    for (const q of sourceQuestions) {
+      const [newQuestion] = await tx
+        .insert(questions)
+        .values({
+          quizId: newQuiz.id,
+          text: q.text,
+          type: q.type,
+          position: q.position,
+        })
+        .returning({ id: questions.id })
+
+      const opts = optionsByQuestion.get(q.id) ?? []
+      if (opts.length > 0) {
+        await tx.insert(questionOptions).values(
+          opts.map((o) => ({
+            questionId: newQuestion.id,
+            text: o.text,
+            explanation: o.explanation,
+            isCorrect: o.isCorrect,
+            position: o.position,
+          })),
+        )
+      }
+    }
+
+    return newQuiz.id
+  })
+
+  return { id: newQuizId }
 }
