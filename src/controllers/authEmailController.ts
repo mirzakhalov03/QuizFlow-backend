@@ -23,7 +23,7 @@ const confirmRegistration = async (req: Request, res: Response, next: NextFuncti
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/analytics`)
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }
@@ -36,7 +36,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/analytics`)
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }

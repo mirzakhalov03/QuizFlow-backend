@@ -33,6 +33,22 @@ services:
       postgres:
         condition: service_healthy
 
+  # Dedup lock for async AI feedback jobs (services/clients/redis.client.ts).
+  redis:
+    image: redis:7-alpine
+    container_name: backend-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   pgadmin_data:
+  redis_data:

@@ -62,8 +62,7 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
-    return res.redirect(`${frontendUrl}/app/analytics`)
+    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
   } catch (error) {
     next(error)
   }
