@@ -8,7 +8,6 @@ import Question from '../models/question.model'
 import QuestionOption from '../models/questionOption.model'
 import Quiz from '../models/quiz.model'
 import UserAnswer from '../models/userAnswer.model'
-import UserApiKey from '../models/userApiKey.model'
 import { FEEDBACK_SYSTEM_PROMPT } from '../prompts'
 
 const MIN_QUIZ_COUNT = 3
@@ -156,14 +155,12 @@ export const generateFeedbackForUser = async (userId: string): Promise<void> => 
     }
   }
 
-  // 8. Resolve API key — use user's own key if available, fall back to default
-  const userApiKey = await UserApiKey.findLatestByUserId(userId)
-  const apiKey = userApiKey ? userApiKey.decrypted() : undefined
-
-  // 9. Call AI
+  // 8. Call AI — always use the platform key, never the user's BYOK key.
+  // Feedback is a platform-initiated background job (nightly cron), so it must
+  // not depend on a user's key, which may be missing, invalid, or out of
+  // credits. (BYOK still applies to user-initiated quiz generation, not here.)
   const feedback = await chatJSON<FeedbackOutput>({
     model: DEFAULT_MODEL,
-    apiKey,
     schema: feedbackSchema,
     temperature: 0.4,
     messages: [
@@ -178,7 +175,7 @@ export const generateFeedbackForUser = async (userId: string): Promise<void> => 
     ],
   })
 
-  // 10. Store result in user_profiles
+  // 9. Store result in user_profiles
   await db
     .update(userProfiles)
     .set({
