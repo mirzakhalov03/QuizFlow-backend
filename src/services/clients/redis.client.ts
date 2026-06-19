@@ -16,6 +16,7 @@ const CONNECT_RETRY_COOLDOWN_MS = 30_000
 type RedisClient = ReturnType<typeof createClient>
 
 let client: RedisClient | null = null
+let connectPromise: Promise<RedisClient> | null = null
 let lastConnectFailureAt = 0
 
 const errText = (err: unknown): string => {
@@ -27,38 +28,49 @@ const errText = (err: unknown): string => {
 
 const getRedisClient = async (): Promise<RedisClient> => {
   if (client?.isReady) return client
+  // Coalesce concurrent callers onto a single in-flight connect so we never
+  // call connect() twice on the same client ('Socket already opened').
+  if (connectPromise) return connectPromise
 
   if (Date.now() - lastConnectFailureAt < CONNECT_RETRY_COOLDOWN_MS) {
     throw new Error('Redis recently unreachable, skipping connect attempt')
   }
 
-  if (!client) {
-    client = createClient({
-      socket: {
-        host: REDIS_HOST,
-        port: REDIS_PORT,
-        connectTimeout: 5000,
-        // Give up after a few attempts so callers can fail open instead of
-        // hanging on the default infinite-retry strategy.
-        reconnectStrategy: (retries) => (retries >= 3 ? false : 1000),
-      },
-    })
-    client.on('error', (err) => {
-      logger.error('Redis client error', { error: errText(err) })
-    })
-  }
-
-  if (!client.isOpen) {
-    try {
-      await client.connect()
-    } catch (err) {
-      lastConnectFailureAt = Date.now()
-      throw err
+  connectPromise = (async () => {
+    if (!client) {
+      client = createClient({
+        socket: {
+          host: REDIS_HOST,
+          port: REDIS_PORT,
+          connectTimeout: 5000,
+          // Give up after a few attempts so callers can fail open instead of
+          // hanging on the default infinite-retry strategy.
+          reconnectStrategy: (retries) => (retries >= 3 ? false : 1000),
+        },
+      })
+      client.on('error', (err) => {
+        logger.error('Redis client error', { error: errText(err) })
+      })
     }
-  }
 
-  lastConnectFailureAt = 0
-  return client
+    if (!client.isOpen) {
+      try {
+        await client.connect()
+      } catch (err) {
+        lastConnectFailureAt = Date.now()
+        throw err
+      }
+    }
+
+    lastConnectFailureAt = 0
+    return client
+  })()
+
+  try {
+    return await connectPromise
+  } finally {
+    connectPromise = null
+  }
 }
 
 const lockKey = (userId: string): string => `feedback:lock:${userId}`

@@ -82,6 +82,8 @@ const startFeedbackWorker = async (): Promise<void> => {
   }
 
   logger.info('feedbackWorker shut down cleanly', { worker: 'feedbackWorker' })
+  // The open Redis socket keeps the event loop alive, so exit explicitly.
+  process.exit(0)
 }
 
 const shutdown = (signal: string): void => {

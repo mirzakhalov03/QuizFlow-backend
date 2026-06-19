@@ -1,5 +1,5 @@
 import { logger } from '../../config/logger'
-import { acquireFeedbackLock } from '../clients/redis.client'
+import { acquireFeedbackLock, releaseFeedbackLock } from '../clients/redis.client'
 import { sendJob } from '../clients/sqs.client'
 
 export const publishFeedbackJob = async (userId: string): Promise<void> => {
@@ -10,5 +10,12 @@ export const publishFeedbackJob = async (userId: string): Promise<void> => {
     return
   }
 
-  await sendJob({ userId })
+  try {
+    await sendJob({ userId })
+  } catch (err) {
+    // Release the lock we just took so a publish failure doesn't block this
+    // user's feedback for the full lock TTL (~1h).
+    await releaseFeedbackLock(userId)
+    throw err
+  }
 }
