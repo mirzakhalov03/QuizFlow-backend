@@ -7,12 +7,19 @@ import {
 } from '../../src/helpers/apiKeyCrypto'
 
 describe('apiKeyCrypto', () => {
+  let originalSecret: string | undefined
+
   beforeEach(() => {
+    originalSecret = process.env.API_KEY_ENCRYPTION_SECRET
     process.env.API_KEY_ENCRYPTION_SECRET = 'test-encryption-secret'
   })
 
   afterEach(() => {
-    process.env.API_KEY_ENCRYPTION_SECRET = 'test-encryption-secret'
+    if (originalSecret === undefined) {
+      delete process.env.API_KEY_ENCRYPTION_SECRET
+    } else {
+      process.env.API_KEY_ENCRYPTION_SECRET = originalSecret
+    }
   })
 
   describe('encrypt / decrypt round-trip', () => {

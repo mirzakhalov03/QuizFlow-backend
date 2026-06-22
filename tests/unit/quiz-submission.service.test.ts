@@ -1,4 +1,4 @@
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { describe, it, vi, beforeEach, expect, type Mock } from 'vitest'
 
 import { AppError } from '../../src/helpers/AppError'
 import { scoreAnswers, submitQuiz } from '../../src/services/quiz-submission.service'
@@ -231,7 +231,7 @@ describe('submitQuiz duplicate-answer handling', () => {
     ])
 
     // Find the quiz_results insert payload (the object carrying the score).
-    const valuesFn = txMock.values as unknown as { mock: { calls: unknown[][] } }
+    const valuesFn = txMock.values as Mock
     const valuesCalls = valuesFn.mock.calls.map((c) => c[0])
     const scorePayload = valuesCalls.find(
       (v): v is { totalQuestions: number; correctAnswers: number; wrongAnswers: number } =>
