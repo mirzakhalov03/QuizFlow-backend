@@ -12,49 +12,40 @@ export const GenerateQuizSourceSchema = z.object({
 
 export const GenerateQuizSchema = z
   .object({
-    /** Notion page IDs — required when source=notion, supports multiple pages */
     pageIds: z
       .union([z.array(z.string().min(1)).min(1).max(50), z.string().min(1)])
       .transform((val) => (Array.isArray(val) ? val : [val]))
       .optional(),
 
-    /** Full S3 URL (s3://bucket/key) or standard AWS HTTPS URL. Takes precedence over `bucket`+`key`. */
     s3Url: z
       .string()
       .regex(/^(s3|https?):\/\/.+/, { message: 'Must be a valid S3 or HTTP(S) URL' })
       .optional(),
 
-    /** S3 bucket name. Required when `s3Url` is not provided. */
     bucket: z.string().min(1, 'bucket must not be empty').optional(),
 
-    /** S3 object key. Required when `s3Url` and `keys` are not provided. */
     key: z.string().min(1, 'key must not be empty').optional(),
 
-    /** Multiple S3 object keys. Takes precedence over `key` when provided. */
     keys: z.array(z.string().min(1)).min(1).optional(),
 
-    /** Human-readable quiz title (max 200 chars). */
     title: z.string().min(1).max(200).optional(),
 
-    /** Additional generation instructions for the AI. */
     userInstructions: z.string().max(1000).optional(),
 
-    /** Whether a per-question countdown timer should be enabled. */
     isTimerEnabled: z.boolean().optional(),
 
-    /** Duration in seconds per question. Must be a positive integer when supplied. */
     timerDuration: z.coerce
       .number()
       .int()
       .positive('timerDuration must be a positive integer')
       .optional(),
 
-    /** Question format for the generated quiz. */
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
 
-    /** AI model to use for quiz generation. */
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
+
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
 
     folderId: z.string().uuid().optional(),
@@ -117,11 +108,6 @@ export const PatchQuizSchema = z
 
 export type PatchQuizInput = z.infer<typeof PatchQuizSchema>
 
-/**
- * Filter by one or more question types. Accepts a repeated `types` param
- * (`?types=open_ended&types=true_false`) or a comma-separated list
- * (`?types=open_ended,true_false`). Normalised to a deduped array.
- */
 const QuestionTypesFilter = z.preprocess((val) => {
   if (val === undefined || val === null) return undefined
   const raw = Array.isArray(val) ? val.flatMap((v) => String(v).split(',')) : String(val).split(',')
@@ -142,11 +128,8 @@ export const GetQuizzesSchema = z.object({
     .default(20),
   offset: z.coerce.number().int().min(0, 'offset must be a non-negative integer').default(0),
   search: z.string().trim().min(1).optional(),
-  /** Filter quizzes by question type. */
   types: QuestionTypesFilter,
-  /** Sort by creation date: newest first (default) or oldest first. */
   sort: z.enum(['newest', 'oldest']).default('newest'),
-  /** Exclude quizzes that are in a specific folder */
   excludeFolderId: z.string().uuid().optional(),
 })
 
@@ -174,6 +157,8 @@ export const GenerateQuizFromNotionSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
 
     folderId: z.uuid().optional(),
     apiKeyId: z.uuid().optional(),
@@ -246,10 +231,3 @@ export const SubmitQuizSchema = z.object({
 })
 
 export type SubmitQuizInput = z.infer<typeof SubmitQuizSchema>
-
-export const PublicSubmitSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(60),
-  answers: SubmitQuizSchema.shape.answers,
-})
-
-export type PublicSubmitInput = z.infer<typeof PublicSubmitSchema>

@@ -4,13 +4,12 @@ import { successResponse } from '../helpers/apiResponse'
 import { AppError } from '../helpers/AppError'
 import { getAuthUserId } from '../helpers/utils/authUtils'
 import { parseS3Url } from '../helpers/utils/quizUtils'
-import type { AuthRequest } from '../middlewares/authMiddleware'
 import { invokeQuizGenerator } from '../services/helpers/invokeQuizGenerator'
 import notionQuizService from '../services/notion-quiz.service'
 import profileService from '../services/profile.service'
-import { getQuizResult, submitPublicQuiz, submitQuiz } from '../services/quiz-submission.service'
+import { getQuizResult, submitQuiz } from '../services/quiz-submission.service'
 import { getPublicQuizByToken } from '../services/quiz.service'
-import { cloneSharedQuiz, setQuizSharing } from '../services/quiz.service'
+import { setQuizSharing } from '../services/quiz.service'
 import {
   deleteQuizById,
   getJobById,
@@ -23,7 +22,6 @@ import type {
   GenerateQuizInput,
   GetQuizzesQuery,
   PatchQuizInput,
-  PublicSubmitInput,
   SubmitQuizInput,
 } from '../validators/quiz.schema'
 
@@ -48,6 +46,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       difficulty,
       folderId,
       apiKeyId,
+      optionsPerQuestion,
     } = req.body as GenerateQuizInput
     if (source === 'notion') {
       if (!pageIds || pageIds.length === 0) {
@@ -67,6 +66,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         apiKeyId,
         model,
         difficulty,
+        optionsPerQuestion,
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))
@@ -118,6 +118,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       difficulty,
       folderId,
       apiKeyId,
+      optionsPerQuestion,
     })
 
     return res.status(202).json(
@@ -181,64 +182,18 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   }
 }
 
-export const getPublicQuizController = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-) => {
+export const getPublicQuizController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rawToken = req.params.shareToken
     const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
 
     if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
 
-    // optionalAuthMiddleware populates req.user when a valid cookie is present.
-    const quiz = await getPublicQuizByToken(shareToken, req.user?.id)
+    const quiz = await getPublicQuizByToken(shareToken)
 
     if (!quiz) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
 
     res.status(200).json(successResponse('Public quiz retrieved successfully', quiz))
-  } catch (error) {
-    next(error)
-  }
-}
-
-export const submitPublicQuizController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const rawToken = req.params.shareToken
-    const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
-    if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
-
-    const { name, answers } = req.body as PublicSubmitInput
-    const result = await submitPublicQuiz(shareToken, name.trim(), answers)
-
-    if (!result) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
-
-    res.status(200).json(successResponse('Quiz submitted successfully', result))
-  } catch (error) {
-    next(error)
-  }
-}
-
-export const cloneSharedQuizController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const userId = getAuthUserId(req)
-    const rawToken = req.params.shareToken
-    const shareToken = typeof rawToken === 'string' ? rawToken : rawToken?.[0]
-    if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
-
-    const result = await cloneSharedQuiz(shareToken, userId)
-    if (!result) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
-
-    res.status(201).json(successResponse('Quiz added to your library', result))
   } catch (error) {
     next(error)
   }
@@ -280,8 +235,7 @@ export const exportQuizPdfController = async (req: Request, res: Response, next:
       throw new AppError('Quiz not found', 404, 'NOT_FOUND')
     }
 
-    const withAnswers = String(req.query.withAnswers) !== 'false'
-    const pdf = await generateQuizPdf(quiz, withAnswers)
+    const pdf = await generateQuizPdf(quiz)
 
     const safeName = quiz.title.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'quiz'
     res.setHeader('Content-Type', 'application/pdf')

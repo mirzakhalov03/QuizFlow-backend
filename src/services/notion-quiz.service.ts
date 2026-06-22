@@ -22,6 +22,7 @@ export type GenerateQuizFromNotionInput = {
   apiKeyId?: string
   model?: string
   difficulty?: DifficultyType
+  optionsPerQuestion?: number
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -30,11 +31,9 @@ const CONCURRENT_NOTION_FETCHES = 5
 class NotionQuizService {
   async generateQuizFromNotionPage(input: GenerateQuizFromNotionInput) {
     try {
-      // 1. Fetch content from all pages with concurrency limit
       const uniquePageIds = [...new Set(input.pageIds)]
       const pageContents: string[] = []
 
-      // Simple chunked processing to avoid firing too many parallel fetches
       for (let i = 0; i < uniquePageIds.length; i += CONCURRENT_NOTION_FETCHES) {
         const chunk = uniquePageIds.slice(i, i + CONCURRENT_NOTION_FETCHES)
         const chunkResults = await Promise.all(
@@ -53,7 +52,6 @@ class NotionQuizService {
         )
       }
 
-      // 2. Check size
       const contentBytes = Buffer.byteLength(notionContent, 'utf8')
       if (contentBytes > MAX_NOTION_CONTENT_BYTES) {
         throw new AppError(
@@ -63,7 +61,6 @@ class NotionQuizService {
         )
       }
 
-      // 3. Upload combined content to S3 as a single temp file
       const key = `notion-temp/${input.userId}/${randomUUID()}.txt`
       await s3Client.send(
         new PutObjectCommand({
@@ -74,7 +71,6 @@ class NotionQuizService {
         }),
       )
 
-      // 4. Invoke quiz generator Lambda
       const jobId = await invokeQuizGenerator({
         bucket: s3BucketName,
         keys: [key],
@@ -89,6 +85,7 @@ class NotionQuizService {
         apiKeyId: input.apiKeyId,
         difficulty: input.difficulty,
         model: input.model,
+        optionsPerQuestion: input.optionsPerQuestion,
       })
 
       return {

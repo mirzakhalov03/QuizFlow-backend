@@ -23,6 +23,7 @@ export type QuizGeneratePayload = {
   difficulty?: DifficultyType
   folderId?: string
   apiKeyId?: string
+  optionsPerQuestion?: number
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env
@@ -45,7 +46,6 @@ export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
     apiKeyName = keyRow[0]?.keyName ?? 'Deleted Key'
   }
 
-  // 1. Create a job record in DB so the client can poll for it
   const [job] = await db
     .insert(quizJobs)
     .values({
@@ -56,20 +56,19 @@ export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
     })
     .returning({ id: quizJobs.id })
 
-  // 2. Fire the Lambda asynchronously — pass jobId so the handler can update the record
   const command = new InvokeCommand({
     FunctionName: LAMBDA_QUIZ_GENERATOR_ARN,
     InvocationType: 'Event',
     Payload: Buffer.from(JSON.stringify({ ...payload, jobId: job.id })),
   })
 
+  console.log('[invokeQuizGenerator] payload:', JSON.stringify({ ...payload, jobId: job.id }))
+
   let response: InvokeCommandOutput
 
   try {
     response = await lambdaClient.send(command)
   } catch (err) {
-    // Network failure, IAM permission error, AWS unavailability, etc.
-    // Mark job failed immediately so the polling client gets actionable feedback.
     const message = err instanceof Error ? err.message : String(err)
     await markJobFailed(job.id, `Lambda invocation error: ${message}`)
     throw new AppError(
@@ -84,7 +83,6 @@ export const invokeQuizGenerator = async (payload: QuizGeneratePayload) => {
     throw new AppError('Failed to invoke quiz generator Lambda', 502, 'LAMBDA_INVOKE_FAILED')
   }
 
-  // Store the AWS requestId for traceability
   await db
     .update(quizJobs)
     .set({ requestId: response.$metadata.requestId })

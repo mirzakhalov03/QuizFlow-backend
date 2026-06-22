@@ -43,8 +43,12 @@ type GenerateOptions = {
   userBio?: string | null
   difficulty?: DifficultyType
   apiKey?: string
+  optionsPerQuestion?: number
 }
 
+// Don't enforce minItems/maxItems at schema level — different question types
+// need different option counts (true_false=2, open_ended=1, mc/ms=optionsPerQuestion).
+// The prompt and post-processing sanitization handle the correct counts instead.
 const buildSchema = (type?: QuestionType) => ({
   name: 'quiz',
   strict: true,
@@ -96,6 +100,7 @@ export const generateQuizFromText = async ({
   userBio,
   difficulty,
   apiKey,
+  optionsPerQuestion,
 }: GenerateOptions): Promise<AiQuizResult> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -146,13 +151,34 @@ export const generateQuizFromText = async ({
     schema: buildSchema(type),
     temperature: 0.3,
     messages: [
-      { role: 'system', content: buildQuizSystemPrompt(type, count, userBio, difficulty) },
+      {
+        role: 'system',
+        content: buildQuizSystemPrompt(type, count, userBio, difficulty, optionsPerQuestion),
+      },
       { role: 'user', content },
     ],
   })
 
+  // Sanitize true_false questions — always exactly 2 options regardless of AI output
+  const sanitizedQuestions = result.data.questions.map((question) => {
+    if (question.type === 'true_false') {
+      const trueOption = question.options.find((o) => o.text === 'True') ?? {
+        text: 'True',
+        isCorrect: false,
+        explanation: '',
+      }
+      const falseOption = question.options.find((o) => o.text === 'False') ?? {
+        text: 'False',
+        isCorrect: false,
+        explanation: '',
+      }
+      return { ...question, options: [trueOption, falseOption] }
+    }
+    return question
+  })
+
   return {
-    quiz: result.data,
+    quiz: { ...result.data, questions: sanitizedQuestions },
     usage: result.usage,
   }
 }

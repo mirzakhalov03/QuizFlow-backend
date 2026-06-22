@@ -1,10 +1,6 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 
-import {
-  gradeOpenEndedAnswers,
-  gradeOpenEndedBatch,
-  type OpenEndedGradeRow,
-} from './open-ended-grading.service'
+import { gradeOpenEndedAnswers } from './open-ended-grading.service'
 import { logger } from '../config/logger'
 import { db } from '../database/database'
 import { questionOptions, questions, quizResults, quizzes, userAnswers } from '../database/schema'
@@ -22,8 +18,6 @@ type QuizQuestion = { id: string; type: QuestionType }
 type SelectedOption = { id: string; questionId: string; isCorrect: boolean }
 
 type ScoreResult = {
-  /** Per-answer correctness for auto-gradable questions; open-ended stay absent
-   *  (null in the DB) until the async grader fills them in. */
   correctnessByQuestion: Map<string, boolean>
   correctAnswers: number
   totalQuestions: number
@@ -31,19 +25,7 @@ type ScoreResult = {
   gradingStatus: 'pending' | 'complete'
 }
 
-/**
- * Pure scoring: given the quiz's questions, the submitted answers, and the
- * selected options, compute per-question correctness and the result totals.
- *
- * Auto-gradable questions are scored here: single-choice (multiple-choice,
- * true/false) by the chosen option, and multi-select by exact set match against
- * `correctOptionIdsByQuestion` (every correct option chosen, no incorrect one).
- * Open-ended questions count toward `totalQuestions` from submit time (stable
- * denominator) but start as not-yet-correct — the async grader adds them later.
- * Assumes `answers` is already deduped (at most one entry per question).
- * Throws if a selected option does not belong to its question.
- */
-export const scoreAnswers = (
+const scoreAnswers = (
   quizQuestions: QuizQuestion[],
   answers: SubmitAnswerInput[],
   optionsById: Map<string, SelectedOption>,
@@ -93,7 +75,6 @@ export const scoreAnswers = (
       const submitted = answer.selectedOptionIds ?? []
       if (submitted.length === 0) continue
 
-      // Every submitted option must belong to this question.
       for (const optId of submitted) {
         const option = optionsById.get(optId)
         if (!option || option.questionId !== answer.questionId) {
@@ -105,7 +86,6 @@ export const scoreAnswers = (
         }
       }
 
-      // Exact match: the submitted set equals the correct set exactly.
       const submittedSet = new Set(submitted)
       const correctSet = correctOptionIdsByQuestion.get(answer.questionId) ?? new Set<string>()
       const isCorrect =
@@ -149,8 +129,6 @@ export const submitQuiz = async (
     return null
   }
 
-  // Keep only the first answer per question. A client could send duplicates
-  // (e.g. a retry from two tabs), and we want one row per question per attempt.
   const seenQuestionIds = new Set<string>()
   const answers = rawAnswers.filter((answer) => {
     if (seenQuestionIds.has(answer.questionId)) return false
@@ -168,9 +146,6 @@ export const submitQuiz = async (
   }
 
   const questionsById = new Map(quizQuestions.map((q) => [q.id, q]))
-
-  // Validate every answer targets a question in this quiz and collect the
-  // option ids we need to fetch for scoring (single + multi-select).
   const referencedOptionIds: string[] = []
 
   for (const answer of answers) {
@@ -202,8 +177,6 @@ export const submitQuiz = async (
 
   const optionsById = new Map(optionRows.map((o) => [o.id, o]))
 
-  // Exact-match scoring needs the full correct set per multi-select question,
-  // not just the options the user picked.
   const multiSelectQuestionIds = quizQuestions
     .filter((q) => q.type === 'multi_select')
     .map((q) => q.id)
@@ -233,8 +206,6 @@ export const submitQuiz = async (
   const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
 
   const result = await db.transaction(async (tx) => {
-    // user_answers stays one row per (user, question) — answer detail tracks
-    // the latest attempt, while score per attempt is preserved in quiz_results.
     const answerValues = quizQuestions.map((q) => {
       const answer = answersByQuestion.get(q.id)
       return {
@@ -264,18 +235,41 @@ export const submitQuiz = async (
         })
     }
 
-    // Append a new attempt rather than upserting — drives History + multi-attempt analytics.
-    const [resultRow] = await tx
-      .insert(quizResults)
-      .values({
-        userId,
-        quizId,
-        totalQuestions,
-        correctAnswers,
-        wrongAnswers,
-        gradingStatus,
-      })
-      .returning()
+    // Manual upsert — avoids onConflictDoUpdate which requires a DB constraint
+    const [existingResult] = await tx
+      .select({ id: quizResults.id })
+      .from(quizResults)
+      .where(and(eq(quizResults.userId, userId), eq(quizResults.quizId, quizId)))
+      .limit(1)
+
+    let resultRow
+    if (existingResult) {
+      const [updated] = await tx
+        .update(quizResults)
+        .set({
+          totalQuestions,
+          correctAnswers,
+          wrongAnswers,
+          gradingStatus,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(quizResults.userId, userId), eq(quizResults.quizId, quizId)))
+        .returning()
+      resultRow = updated
+    } else {
+      const [inserted] = await tx
+        .insert(quizResults)
+        .values({
+          userId,
+          quizId,
+          totalQuestions,
+          correctAnswers,
+          wrongAnswers,
+          gradingStatus,
+        })
+        .returning()
+      resultRow = inserted
+    }
 
     await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
 
@@ -284,199 +278,19 @@ export const submitQuiz = async (
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
 
-  // Grade open-ended answers synchronously so the response carries the final
-  // score. In-process fire-and-forget didn't survive on serverless — the host
-  // froze the process once the response returned, leaving grading stuck in
-  // 'pending'. gradeOpenEndedAnswers handles its own errors and settles the
-  // status to 'complete'/'failed' (bounded by a 30s LLM timeout), so this
-  // never throws; we just re-read the row it updated in place.
   if (gradingStatus === 'pending') {
-    await gradeOpenEndedAnswers(result.id, quizId, userId)
+    await gradeOpenEndedAnswers(quizId, userId)
 
     const [finalized] = await db
       .select()
       .from(quizResults)
-      .where(eq(quizResults.id, result.id))
+      .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
       .limit(1)
 
     if (finalized) return finalized
   }
 
   return result
-}
-
-export type PublicReviewItem = {
-  questionId: string
-  /** true/false = graded verdict; null = an answered open-ended we couldn't grade
-   *  (LLM outage) — dropped from the score, shown as "Not graded" rather than wrong. */
-  isCorrect: boolean | null
-  /** Correct option ids for choice/true-false questions (empty for open-ended). */
-  correctOptionIds: string[]
-  /** Model answer text for open-ended questions only — never the rubric. */
-  modelAnswer?: string
-}
-
-export type PublicSubmitResult = {
-  name: string
-  totalQuestions: number
-  correctAnswers: number
-  wrongAnswers: number
-  review: PublicReviewItem[]
-}
-
-/**
- * Ephemeral scoring for an anonymous (or logged-in) solver of a public quiz.
- * Grades auto-gradable questions in code and answered open-ended questions via
- * one batched LLM call, then returns the score + a per-question review that
- * reveals the correct option(s)/model answer but NEVER the explanation/rubric.
- * Persists nothing. Returns null if the token is not a public quiz.
- */
-export const submitPublicQuiz = async (
-  shareToken: string,
-  name: string,
-  rawAnswers: SubmitAnswerInput[],
-): Promise<PublicSubmitResult | null> => {
-  const [quiz] = await db
-    .select({ id: quizzes.id })
-    .from(quizzes)
-    .where(and(eq(quizzes.shareToken, shareToken), eq(quizzes.isPublic, true)))
-    .limit(1)
-
-  if (!quiz) return null
-  const quizId = quiz.id
-
-  // Keep only the first answer per question (client could send duplicates).
-  const seen = new Set<string>()
-  const answers = rawAnswers.filter((a) => {
-    if (seen.has(a.questionId)) return false
-    seen.add(a.questionId)
-    return true
-  })
-
-  const quizQuestions = await db
-    .select({ id: questions.id, type: questions.type, text: questions.text })
-    .from(questions)
-    .where(eq(questions.quizId, quizId))
-
-  if (quizQuestions.length === 0) {
-    throw new AppError('Quiz has no questions to submit', 400, 'VALIDATION_ERROR')
-  }
-
-  const questionsById = new Map(quizQuestions.map((q) => [q.id, q]))
-  for (const a of answers) {
-    if (!questionsById.has(a.questionId)) {
-      throw new AppError(
-        `Question ${a.questionId} does not belong to this quiz`,
-        400,
-        'VALIDATION_ERROR',
-      )
-    }
-  }
-
-  // Load every option for the quiz: we need isCorrect (auto-grading + answer key)
-  // plus text/explanation for the open-ended model answer + rubric.
-  const optionRows = await db
-    .select({
-      id: questionOptions.id,
-      questionId: questionOptions.questionId,
-      isCorrect: questionOptions.isCorrect,
-      text: questionOptions.text,
-      explanation: questionOptions.explanation,
-    })
-    .from(questionOptions)
-    .innerJoin(questions, eq(questions.id, questionOptions.questionId))
-    .where(eq(questions.quizId, quizId))
-
-  const optionsById = new Map(
-    optionRows.map((o) => [o.id, { id: o.id, questionId: o.questionId, isCorrect: o.isCorrect }]),
-  )
-
-  const correctOptionIdsByQuestion = new Map<string, Set<string>>()
-  for (const o of optionRows) {
-    if (!o.isCorrect) continue
-    const set = correctOptionIdsByQuestion.get(o.questionId) ?? new Set<string>()
-    set.add(o.id)
-    correctOptionIdsByQuestion.set(o.questionId, set)
-  }
-
-  const scoreResult = scoreAnswers(
-    quizQuestions.map((q) => ({ id: q.id, type: q.type as QuestionType })),
-    answers,
-    optionsById,
-    correctOptionIdsByQuestion,
-  )
-
-  // Build open-ended grading rows for answered open-ended questions.
-  const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]))
-  const openEndedRows: OpenEndedGradeRow[] = []
-  for (const q of quizQuestions) {
-    if (q.type !== 'open_ended') continue
-    const userText = answersByQuestion.get(q.id)?.textAnswer?.trim()
-    if (!userText) continue
-    const correctOpt = optionRows.find((o) => o.questionId === q.id && o.isCorrect)
-    openEndedRows.push({
-      questionId: q.id,
-      questionText: q.text,
-      modelAnswer: correctOpt?.text ?? '',
-      rubric: correctOpt?.explanation ?? null,
-      userText,
-    })
-  }
-
-  const openEndedVerdicts = new Map<string, boolean>()
-  if (openEndedRows.length > 0) {
-    try {
-      const verdicts = await gradeOpenEndedBatch(openEndedRows)
-      for (const [qId, isCorrect] of verdicts) openEndedVerdicts.set(qId, isCorrect)
-    } catch (err) {
-      logger.error('Public open-ended grading failed', {
-        error: err instanceof Error ? err.message : String(err),
-      })
-      // Leave openEndedVerdicts empty — handled by the denominator drop below.
-    }
-  }
-
-  let totalQuestions = scoreResult.totalQuestions
-  const openEndedCorrect = [...openEndedVerdicts.values()].filter(Boolean).length
-  let correctAnswers = scoreResult.correctAnswers + openEndedCorrect
-
-  // If open-ended grading failed (answered rows but no verdicts came back), drop
-  // those questions from the denominator so an LLM outage never penalizes the
-  // solver (mirrors the authed path's degrade behavior).
-  if (openEndedRows.length > 0 && openEndedVerdicts.size === 0) {
-    totalQuestions -= openEndedRows.length
-    correctAnswers = scoreResult.correctAnswers
-  }
-
-  const wrongAnswers = totalQuestions - correctAnswers
-
-  // True when grading threw for the whole batch (the denominator-drop case above).
-  // gradeOpenEndedBatch otherwise returns a verdict for every answered row, so a
-  // missing verdict only ever means total failure — never a partial result.
-  const openEndedGradingFailed = openEndedRows.length > 0 && openEndedVerdicts.size === 0
-
-  const review: PublicReviewItem[] = quizQuestions.map((q) => {
-    if (q.type === 'open_ended') {
-      const correctOpt = optionRows.find((o) => o.questionId === q.id && o.isCorrect)
-      const answered = (answersByQuestion.get(q.id)?.textAnswer?.trim() ?? '').length > 0
-      return {
-        questionId: q.id,
-        // Answered open-ended we couldn't grade → null (ungraded), matching its
-        // removal from the score; everything else is its real verdict.
-        isCorrect:
-          openEndedGradingFailed && answered ? null : (openEndedVerdicts.get(q.id) ?? false),
-        correctOptionIds: [],
-        modelAnswer: correctOpt?.text ?? undefined,
-      }
-    }
-    return {
-      questionId: q.id,
-      isCorrect: scoreResult.correctnessByQuestion.get(q.id) ?? false,
-      correctOptionIds: [...(correctOptionIdsByQuestion.get(q.id) ?? new Set<string>())],
-    }
-  })
-
-  return { name, totalQuestions, correctAnswers, wrongAnswers, review }
 }
 
 export const getQuizResult = async (quizId: string, userId: string) => {
@@ -493,7 +307,6 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     })
     .from(quizResults)
     .where(and(eq(quizResults.quizId, quizId), eq(quizResults.userId, userId)))
-    .orderBy(desc(quizResults.createdAt))
     .limit(1)
 
   if (!result) {
@@ -501,8 +314,6 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     return null
   }
 
-  // user_answers is one row per (user, question) — these are always the latest
-  // submission's answers regardless of how many attempts exist in quiz_results.
   const answerRows = await db
     .select({
       questionId: userAnswers.questionId,
@@ -515,7 +326,6 @@ export const getQuizResult = async (quizId: string, userId: string) => {
     .innerJoin(questions, eq(questions.id, userAnswers.questionId))
     .where(and(eq(questions.quizId, quizId), eq(userAnswers.userId, userId)))
 
-  // isCorrect is null until graded, so only non-null rows become verdicts.
   const verdicts = answerRows
     .filter((r) => r.isCorrect !== null)
     .map((r) => ({ questionId: r.questionId, isCorrect: r.isCorrect as boolean }))

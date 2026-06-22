@@ -20,7 +20,10 @@ export const buildQuizSystemPrompt = (
   count: number,
   userBio?: string | null,
   difficulty?: DifficultyType,
+  optionsPerQuestion?: number,
 ) => {
+  const optionCount = optionsPerQuestion ?? 4
+
   const typeRule = type
     ? `Every question MUST be of type "${type}".`
     : `Pick the most appropriate type per question from: ${QUESTION_TYPES.join(', ')}. Vary the types across the quiz — do not use the same type for every question.`
@@ -33,9 +36,9 @@ export const buildQuizSystemPrompt = (
     typeRule,
     '',
     '## Question type constraints',
-    '- "multiple_choice": 4 options, exactly one isCorrect=true.',
-    '- "multi_select": 4–5 options, two or more isCorrect=true.',
-    '- "true_false": exactly two options with the text "True" and "False", exactly one isCorrect=true.',
+    `- "multiple_choice": exactly ${optionCount} options, exactly one isCorrect=true.`,
+    `- "multi_select": exactly ${optionCount} options, two or more isCorrect=true.`,
+    '- "true_false": ALWAYS exactly two options with text "True" and "False" — never more, never fewer, regardless of any other setting. Exactly one isCorrect=true.',
     '- "open_ended": exactly one option whose text is a concise model answer (2–4 sentences). isCorrect=true. The explanation should describe what key points a complete answer must cover.',
     '',
     '## Question quality',

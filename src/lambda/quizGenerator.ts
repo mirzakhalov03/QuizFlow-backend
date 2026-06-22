@@ -19,7 +19,6 @@ import { generateQuizFromText } from '../services/helpers/quizAi'
 import type { AiQuiz, AiQuizResult } from '../services/helpers/quizAi'
 import type { DifficultyType } from '../types/difficultyTypes'
 import type { QuestionType } from '../types/questionTypes'
-// Lambda-local clients — no Express app dependencies, no credential env vars required
 
 type LambdaEvent = {
   jobId: string
@@ -39,6 +38,7 @@ type LambdaEvent = {
   difficulty?: DifficultyType
   folderId?: string
   apiKeyId?: string
+  optionsPerQuestion?: number
 }
 
 const persistQuiz = async (
@@ -53,7 +53,6 @@ const persistQuiz = async (
   const questionsList = Array.isArray(payload.questions) ? payload.questions : []
 
   const quizInsert = await db.transaction(async (tx) => {
-    // ── Insert 1: quiz row ──────────────────────────────────────────────────
     const [quizRow] = await tx
       .insert(quizzes)
       .values({
@@ -77,9 +76,6 @@ const persistQuiz = async (
 
     if (questionsList.length === 0) return quizRow
 
-    // ── Insert 2: all questions in a single statement ───────────────────────
-    // Drizzle guarantees .returning() rows are in the same order as .values(),
-    // so questionRows[i].id safely corresponds to questionsList[i].
     const questionRows = await tx
       .insert(questions)
       .values(
@@ -92,7 +88,6 @@ const persistQuiz = async (
       )
       .returning({ id: questions.id })
 
-    // ── Insert 3: all options for all questions in a single statement ────────
     const allOptionValues = questionsList.flatMap((question, index) => {
       const options = Array.isArray(question.options) ? question.options : []
       return options.map((option, optionIndex) => ({
@@ -126,6 +121,7 @@ const fetchSource = async (bucket: string, key: string): Promise<QuizSource> => 
 }
 
 export const handler = async (event: LambdaEvent) => {
+  console.log('[quizGenerator] optionsPerQuestion:', event.optionsPerQuestion)
   const allKeys = event.keys?.length ? event.keys : event.key ? [event.key] : []
   if (!event?.bucket || allKeys.length === 0 || !event?.userId || !event?.jobId) {
     throw new Error('bucket, key/keys, userId, and jobId are required')
@@ -151,6 +147,7 @@ export const handler = async (event: LambdaEvent) => {
           model: event.model,
           difficulty: event.difficulty,
           apiKey,
+          optionsPerQuestion: event.optionsPerQuestion,
         })
 
     const quizRow = await persistQuiz(result, event, {
@@ -158,7 +155,6 @@ export const handler = async (event: LambdaEvent) => {
       key: allKeys[0],
     })
 
-    // Update job → done
     await db
       .update(quizJobs)
       .set({ status: 'done', quizId: quizRow.id, tokensUsed: result.usage })
@@ -175,7 +171,6 @@ export const handler = async (event: LambdaEvent) => {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[quizGenerator] Failed:', message, err)
 
-    // Update job → failed with error message
     await db
       .update(quizJobs)
       .set({ status: 'failed', error: message })
