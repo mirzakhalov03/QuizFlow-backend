@@ -21,10 +21,12 @@ export const buildQuizSystemPrompt = (
   userBio?: string | null,
   difficulty?: DifficultyType,
 ) => {
-  const typeRule = type
-    ? `Every question MUST be of type "${type}".`
-    : `Pick the most appropriate type per question from: ${QUESTION_TYPES.join(', ')}. Vary the types across the quiz — do not use the same type for every question.`
-
+  const typeRule =
+    type && type !== 'mixed'
+      ? 'Every question MUST be of type "' + type + '".'
+      : 'Pick the most appropriate type per question from: ' +
+        QUESTION_TYPES.join(', ') +
+        '. Vary the types across the quiz — do not use the same type for every question.'
   return [
     'You are an expert quiz designer. Your goal is to produce questions that genuinely test whether a student understood the source material — not just whether they memorised isolated facts.',
     '',

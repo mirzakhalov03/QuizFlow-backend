@@ -85,6 +85,34 @@
       "when": 1781365423279,
       "tag": "0013_add_folder_index",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1782123320380,
+      "tag": "0014_multi_select_answers",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1782123320480,
+      "tag": "0015_byok_analytics",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782123320580,
+      "tag": "0016_drop_quiz_results_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782123738050,
+      "tag": "0017_melted_leo",
+      "breakpoints": true
     }
   ]
 }

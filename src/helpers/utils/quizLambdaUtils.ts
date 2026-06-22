@@ -86,5 +86,6 @@ export const normalizeQuestionType = (value: string | undefined): QuestionType =
   const normalized = (value ?? 'open_ended').trim().toLowerCase().replace(/\s+/g, '_')
   if (normalized === 'multiple_choice' || normalized === 'multi_select') return normalized
   if (normalized === 'true_false' || normalized === 'true/false') return 'true_false'
+  if (normalized === 'mixed') return 'mixed'
   return 'open_ended'
 }
