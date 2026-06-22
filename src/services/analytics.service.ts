@@ -270,7 +270,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     if (percent > allFolder.best) allFolder.best = percent
 
     const folderKey = r.folderId ?? ''
-    const folderName = r.folderId ? (r.folderName ?? 'Unnamed folder') : 'Root'
+    const folderName = r.folderId ? (r.folderName ?? 'Unnamed folder') : 'Unassigned'
     const folderAcc = folderAccs.get(folderKey) ?? { folderName, sum: 0, best: 0, count: 0 }
     folderAcc.sum += percent
     folderAcc.count += 1
