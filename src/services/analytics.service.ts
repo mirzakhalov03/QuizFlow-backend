@@ -190,11 +190,15 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   const questionTypeCounts = new Map<QuestionType, number>(
     questionTypeRows.map((row) => [row.type, row.count]),
   )
-  // Always send all 4 type slices so the pie chart can zero-fill empties.
-  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({
-    type,
-    questionCount: questionTypeCounts.get(type) ?? 0,
-  }))
+  // Always send the real question-type slices so the pie chart can zero-fill
+  // empties. 'mixed' is a quiz-level type, never a question type, so it is
+  // excluded from the per-question breakdown.
+  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.filter((type) => type !== 'mixed').map(
+    (type) => ({
+      type,
+      questionCount: questionTypeCounts.get(type) ?? 0,
+    }),
+  )
 
   if (quizRows.length === 0) {
     return {
