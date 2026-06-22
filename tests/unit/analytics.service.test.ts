@@ -8,6 +8,7 @@ const { dbMock } = vi.hoisted(() => {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     then: vi.fn((resolve) => resolve([])),
   }
@@ -24,6 +25,7 @@ describe('AnalyticsService', () => {
     dbMock.select.mockReturnThis()
     dbMock.from.mockReturnThis()
     dbMock.innerJoin.mockReturnThis()
+    dbMock.leftJoin.mockReturnThis()
     dbMock.where.mockReturnThis()
   })
 
