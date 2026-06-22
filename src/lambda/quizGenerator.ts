@@ -144,7 +144,7 @@ export const handler = async (event: LambdaEvent) => {
       : await generateQuizFromText({
           sources,
           questionCount: event.questionCount,
-          type: event.type ? (normalizeQuestionType(event.type) as QuestionType) : undefined,
+          type: normalizeQuestionType(event.type) as QuestionType,
           userInstructions: event.userInstructions,
           userBio: event.userBio,
           defaultTitle: event.title,

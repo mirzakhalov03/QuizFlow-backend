@@ -26,6 +26,7 @@ const TYPE_LABEL: Record<QuestionType, string> = {
   multi_select: 'Multi-select',
   open_ended: 'Open-ended',
   true_false: 'True / false',
+  mixed: 'Mixed',
 }
 
 /** Escape user-supplied text so it can't break or inject into the HTML. */

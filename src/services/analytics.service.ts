@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
 import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
-import { folders, quizJobs, quizResults, quizzes } from '../database/schema'
+import { folders, questions, quizJobs, quizResults, quizzes } from '../database/schema'
 import { QUESTION_TYPES } from '../types/questionTypes'
 import type { QuestionType } from '../types/questionTypes'
 
@@ -15,7 +15,7 @@ export type ScorePoint = {
 
 export type TypeBreakdown = {
   type: QuestionType
-  quizCount: number
+  questionCount: number
 }
 
 export type QuizHistoryItem = {
@@ -78,32 +78,44 @@ const toPercent = (correct: number, total: number) => (total > 0 ? (correct / to
 const round = (n: number) => Math.round(n * 100) / 100
 
 export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
-  const quizRows = await db
-    .select({
-      quizId: quizResults.quizId,
-      quizTitle: quizzes.title,
-      createdAt: quizResults.createdAt,
-      totalQuestions: quizResults.totalQuestions,
-      correctAnswers: quizResults.correctAnswers,
-      quizType: quizzes.type,
-      folderId: quizzes.folderId,
-      folderName: folders.name,
-    })
-    .from(quizResults)
-    .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
-    .leftJoin(folders, eq(quizzes.folderId, folders.id))
-    .where(eq(quizResults.userId, userId))
+  // These three reads are independent, so run them concurrently rather than
+  // serializing the round-trips. `questionTypeRows` counts every question across
+  // all quizzes the user owns (taken or not), so a mixed-type quiz contributes
+  // to each type it contains rather than a single quiz-level bucket.
+  const [quizRows, tokenUsageRows, questionTypeRows] = await Promise.all([
+    db
+      .select({
+        quizId: quizResults.quizId,
+        quizTitle: quizzes.title,
+        createdAt: quizResults.createdAt,
+        totalQuestions: quizResults.totalQuestions,
+        correctAnswers: quizResults.correctAnswers,
+        folderId: quizzes.folderId,
+        folderName: folders.name,
+      })
+      .from(quizResults)
+      .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
+      .leftJoin(folders, eq(quizzes.folderId, folders.id))
+      .where(eq(quizResults.userId, userId)),
 
-  const tokenUsageRows = await db
-    .select({
-      tokensUsed: quizJobs.tokensUsed,
-      apiKeyId: quizJobs.apiKeyId,
-      apiKeyName: quizJobs.apiKeyName,
-      properties: quizzes.properties,
-    })
-    .from(quizJobs)
-    .leftJoin(quizzes, eq(quizJobs.quizId, quizzes.id))
-    .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done')))
+    db
+      .select({
+        tokensUsed: quizJobs.tokensUsed,
+        apiKeyId: quizJobs.apiKeyId,
+        apiKeyName: quizJobs.apiKeyName,
+        properties: quizzes.properties,
+      })
+      .from(quizJobs)
+      .leftJoin(quizzes, eq(quizJobs.quizId, quizzes.id))
+      .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done'))),
+
+    db
+      .select({ type: questions.type, count: sql<number>`count(*)::int` })
+      .from(questions)
+      .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
+      .where(eq(quizzes.userId, userId))
+      .groupBy(questions.type),
+  ])
 
   let totalTokensUsed = 0
   const keyMap = new Map<
@@ -175,15 +187,21 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }))
     .sort((a, b) => b.tokensUsed - a.tokensUsed)
 
+  const questionTypeCounts = new Map<QuestionType, number>(
+    questionTypeRows.map((row) => [row.type, row.count]),
+  )
   // Always send all 4 type slices so the pie chart can zero-fill empties.
-  const emptyTypeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({ type, quizCount: 0 }))
+  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({
+    type,
+    questionCount: questionTypeCounts.get(type) ?? 0,
+  }))
 
   if (quizRows.length === 0) {
     return {
       totalQuizzesTaken: 0,
       averageScore: 0,
       scoreOverTime: [],
-      typeBreakdown: emptyTypeBreakdown,
+      typeBreakdown,
       folderStats: [
         {
           folderId: null,
@@ -219,7 +237,6 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   // folderId may be null (root). Key the map by '' for null so it slots in cleanly.
   const folderAccs = new Map<string, FolderAcc>()
   const quizAccs = new Map<string, QuizAcc>()
-  const seenQuizTypes = new Map<string, QuestionType>()
 
   for (const r of quizRows) {
     if (r.totalQuestions <= 0) continue
@@ -267,23 +284,11 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     quizAcc.count += 1
     if (percent > quizAcc.best) quizAcc.best = percent
     quizAccs.set(r.quizId, quizAcc)
-
-    if (r.quizType) seenQuizTypes.set(r.quizId, r.quizType)
   }
 
   const averageScore = gradedCount > 0 ? gradedScoreSum / gradedCount : 0
 
   scoreOverTime.sort((a, b) => a.date.localeCompare(b.date))
-
-  // Count distinct quizzes per type so the pie reflects library composition.
-  const typeCounts = new Map<QuestionType, number>()
-  for (const type of seenQuizTypes.values()) {
-    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1)
-  }
-  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.map((type) => ({
-    type,
-    quizCount: typeCounts.get(type) ?? 0,
-  }))
 
   const folderStats: FolderStat[] = [
     {

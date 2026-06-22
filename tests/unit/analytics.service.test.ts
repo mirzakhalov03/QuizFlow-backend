@@ -3,35 +3,37 @@ import { describe, it, vi, beforeEach } from 'vitest'
 
 import * as analyticsService from '../../src/services/analytics.service'
 
-const { dbMock } = vi.hoisted(() => {
-  const mock = {
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    innerJoin: vi.fn().mockReturnThis(),
-    leftJoin: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    then: vi.fn((resolve) => resolve([])),
+// A thenable query-builder mock: every chained call returns the builder, and
+// awaiting it resolves the next value queued in `queue` (in db-call order).
+// getAnalyticsSummary issues three reads: quiz results, token usage, then the
+// per-question-type counts.
+const { dbMock, queue } = vi.hoisted(() => {
+  const queue: unknown[] = []
+  const builder: Record<string, unknown> = {}
+  const chain = () => builder
+  for (const m of ['select', 'from', 'where', 'innerJoin', 'leftJoin', 'groupBy', 'orderBy']) {
+    builder[m] = vi.fn(chain)
   }
-  return { dbMock: mock }
+  builder.then = (resolve: (value: unknown) => unknown) =>
+    resolve(queue.length > 0 ? queue.shift() : [])
+  return { dbMock: builder, queue }
 })
 
-vi.mock('../../src/database/database', () => ({
-  db: dbMock,
-}))
+vi.mock('../../src/database/database', () => ({ db: dbMock }))
+
+const byType = (breakdown: Array<{ type: string; questionCount: number }>) =>
+  Object.fromEntries(breakdown.map((t) => [t.type, t.questionCount]))
 
 describe('AnalyticsService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    dbMock.select.mockReturnThis()
-    dbMock.from.mockReturnThis()
-    dbMock.innerJoin.mockReturnThis()
-    dbMock.leftJoin.mockReturnThis()
-    dbMock.where.mockReturnThis()
+    queue.length = 0
   })
 
   describe('getAnalyticsSummary', () => {
     it('should return empty summary when no quiz results exist', async () => {
-      dbMock.where.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      // quizRows, tokenUsageRows, questionTypeRows
+      queue.push([], [], [])
 
       const result = await analyticsService.getAnalyticsSummary('user-1')
       expect(result.totalQuizzesTaken).to.equal(0)
@@ -47,18 +49,66 @@ describe('AnalyticsService', () => {
           createdAt: new Date('2024-01-01'),
           totalQuestions: 10,
           correctAnswers: 8,
-          quizType: 'multiple_choice',
         },
       ]
       const mockTokenRows = [{ tokensUsed: { total_tokens: 100 } }]
 
-      dbMock.where.mockResolvedValueOnce(mockQuizRows).mockResolvedValueOnce(mockTokenRows)
+      queue.push(mockQuizRows, mockTokenRows, [])
 
       const result = await analyticsService.getAnalyticsSummary('user-1')
       expect(result.totalQuizzesTaken).to.equal(1)
       expect(result.averageScore).to.equal(80)
       expect(result.totalTokensUsed).to.equal(100)
       expect(result.history[0].quizTitle).to.equal('Quiz 1')
+    })
+
+    it('should count questions per type so a mixed quiz spans multiple slices', async () => {
+      const mockQuizRows = [
+        {
+          quizId: 'q-1',
+          quizTitle: 'Mixed Quiz',
+          createdAt: new Date('2024-01-01'),
+          totalQuestions: 10,
+          correctAnswers: 5,
+        },
+      ]
+      // One mixed quiz: 6 multiple-choice + 4 true/false questions.
+      const questionTypeRows = [
+        { type: 'multiple_choice', count: 6 },
+        { type: 'true_false', count: 4 },
+      ]
+
+      queue.push(mockQuizRows, [], questionTypeRows)
+
+      const result = await analyticsService.getAnalyticsSummary('user-1')
+      const counts = byType(result.typeBreakdown)
+
+      // The mixed quiz contributes to both type slices, not a single bucket.
+      expect(counts.multiple_choice).to.equal(6)
+      expect(counts.true_false).to.equal(4)
+      // All four types are always present, zero-filled.
+      expect(result.typeBreakdown).to.have.lengthOf(4)
+      expect(counts.multi_select).to.equal(0)
+      expect(counts.open_ended).to.equal(0)
+    })
+
+    it('should count questions from owned quizzes even when none were taken', async () => {
+      // No quiz results, but the user owns quizzes with questions.
+      const questionTypeRows = [
+        { type: 'multiple_choice', count: 3 },
+        { type: 'open_ended', count: 2 },
+      ]
+
+      queue.push([], [], questionTypeRows)
+
+      const result = await analyticsService.getAnalyticsSummary('user-1')
+      const counts = byType(result.typeBreakdown)
+
+      expect(result.totalQuizzesTaken).to.equal(0)
+      expect(counts.multiple_choice).to.equal(3)
+      expect(counts.open_ended).to.equal(2)
+      expect(counts.true_false).to.equal(0)
+      expect(counts.multi_select).to.equal(0)
     })
   })
 })
