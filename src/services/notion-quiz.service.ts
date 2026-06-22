@@ -73,6 +73,7 @@ class NotionQuizService {
           ContentType: 'text/plain',
         }),
       )
+      console.log('Question Type: ' + input.type)
 
       // 4. Invoke quiz generator Lambda
       const jobId = await invokeQuizGenerator({

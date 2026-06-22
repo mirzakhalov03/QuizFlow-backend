@@ -1,9 +1,81 @@
 {
-  "id": "efcaa69d-9e34-435b-90dd-3aeace4c21b0",
-  "prevId": "cd5d8234-69c1-4781-bc1f-f16ae87206c5",
+  "id": "d1183a08-a6c1-41d7-a574-73474e39a4e2",
+  "prevId": "72a300dc-f4f5-41d6-9b63-52f1f8d2b750",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.folders": {
+      "name": "folders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "folders_user_id_idx": {
+          "name": "folders_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "folders_user_id_users_id_fk": {
+          "name": "folders_user_id_users_id_fk",
+          "tableFrom": "folders",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.otps": {
       "name": "otps",
       "schema": "",
@@ -242,6 +314,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "api_key_id": {
+          "name": "api_key_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "api_key_name": {
+          "name": "api_key_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "error": {
           "name": "error",
           "type": "text",
@@ -310,6 +394,15 @@
           "tableFrom": "quiz_jobs",
           "tableTo": "quizzes",
           "columnsFrom": ["quiz_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "quiz_jobs_api_key_id_user_api_keys_id_fk": {
+          "name": "quiz_jobs_api_key_id_user_api_keys_id_fk",
+          "tableFrom": "quiz_jobs",
+          "tableTo": "user_api_keys",
+          "columnsFrom": ["api_key_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -438,13 +531,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "quiz_results_user_quiz_unique": {
-          "name": "quiz_results_user_quiz_unique",
-          "nullsNotDistinct": false,
-          "columns": ["user_id", "quiz_id"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -471,6 +558,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "folder_id": {
+          "name": "folder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "type": {
           "name": "type",
@@ -566,6 +659,15 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "quizzes_folder_id_folders_id_fk": {
+          "name": "quizzes_folder_id_folders_id_fk",
+          "tableFrom": "quizzes",
+          "tableTo": "folders",
+          "columnsFrom": ["folder_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -606,6 +708,12 @@
         "selected_option_id": {
           "name": "selected_option_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "selected_option_ids": {
+          "name": "selected_option_ids",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
