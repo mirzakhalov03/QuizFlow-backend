@@ -78,31 +78,44 @@ const toPercent = (correct: number, total: number) => (total > 0 ? (correct / to
 const round = (n: number) => Math.round(n * 100) / 100
 
 export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
-  const quizRows = await db
-    .select({
-      quizId: quizResults.quizId,
-      quizTitle: quizzes.title,
-      createdAt: quizResults.createdAt,
-      totalQuestions: quizResults.totalQuestions,
-      correctAnswers: quizResults.correctAnswers,
-      folderId: quizzes.folderId,
-      folderName: folders.name,
-    })
-    .from(quizResults)
-    .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
-    .leftJoin(folders, eq(quizzes.folderId, folders.id))
-    .where(eq(quizResults.userId, userId))
+  // These three reads are independent, so run them concurrently rather than
+  // serializing the round-trips. `questionTypeRows` counts every question across
+  // all quizzes the user owns (taken or not), so a mixed-type quiz contributes
+  // to each type it contains rather than a single quiz-level bucket.
+  const [quizRows, tokenUsageRows, questionTypeRows] = await Promise.all([
+    db
+      .select({
+        quizId: quizResults.quizId,
+        quizTitle: quizzes.title,
+        createdAt: quizResults.createdAt,
+        totalQuestions: quizResults.totalQuestions,
+        correctAnswers: quizResults.correctAnswers,
+        folderId: quizzes.folderId,
+        folderName: folders.name,
+      })
+      .from(quizResults)
+      .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
+      .leftJoin(folders, eq(quizzes.folderId, folders.id))
+      .where(eq(quizResults.userId, userId)),
 
-  const tokenUsageRows = await db
-    .select({
-      tokensUsed: quizJobs.tokensUsed,
-      apiKeyId: quizJobs.apiKeyId,
-      apiKeyName: quizJobs.apiKeyName,
-      properties: quizzes.properties,
-    })
-    .from(quizJobs)
-    .leftJoin(quizzes, eq(quizJobs.quizId, quizzes.id))
-    .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done')))
+    db
+      .select({
+        tokensUsed: quizJobs.tokensUsed,
+        apiKeyId: quizJobs.apiKeyId,
+        apiKeyName: quizJobs.apiKeyName,
+        properties: quizzes.properties,
+      })
+      .from(quizJobs)
+      .leftJoin(quizzes, eq(quizJobs.quizId, quizzes.id))
+      .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done'))),
+
+    db
+      .select({ type: questions.type, count: sql<number>`count(*)::int` })
+      .from(questions)
+      .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
+      .where(eq(quizzes.userId, userId))
+      .groupBy(questions.type),
+  ])
 
   let totalTokensUsed = 0
   const keyMap = new Map<
@@ -173,16 +186,6 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       percentage: totalTokensUsed > 0 ? round((m.tokens / totalTokensUsed) * 100) : 0,
     }))
     .sort((a, b) => b.tokensUsed - a.tokensUsed)
-
-  // Breakdown by question type counts every question across all quizzes the
-  // user owns (taken or not), so a mixed-type quiz contributes to each type it
-  // actually contains rather than a single quiz-level bucket.
-  const questionTypeRows = await db
-    .select({ type: questions.type, count: sql<number>`count(*)::int` })
-    .from(questions)
-    .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
-    .where(eq(quizzes.userId, userId))
-    .groupBy(questions.type)
 
   const questionTypeCounts = new Map<QuestionType, number>(
     questionTypeRows.map((row) => [row.type, row.count]),
