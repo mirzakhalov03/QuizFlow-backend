@@ -22,7 +22,7 @@ const supportsJsonSchema = (model: string): boolean =>
 
 /** Strip markdown code fences that some models wrap around JSON output. */
 const stripMarkdownFences = (content: string): string => {
-  const fenceMatch = content.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/)
+  const fenceMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
   return fenceMatch ? fenceMatch[1].trim() : content.trim()
 }
 
@@ -73,18 +73,30 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
   const useJsonSchema = supportsJsonSchema(options.model)
   // For models that don't support json_schema, inject a JSON instruction so
   // they know to respond with raw JSON matching the schema.
-  const messages: ChatMessage[] = useJsonSchema
-    ? options.messages
-    : [
-        ...options.messages,
-        {
-          role: 'user',
-          content:
-            'Respond with ONLY valid raw JSON (no markdown, no code fences) that strictly matches this JSON schema:\n' +
-            JSON.stringify(options.schema.schema, null, 2),
-        } satisfies ChatMessage,
-      ]
+  const messages: ChatMessage[] = [...options.messages]
+  if (!useJsonSchema) {
+    const instruction =
+      'Respond with ONLY valid raw JSON (no markdown, no code fences) that strictly matches this JSON schema:\n' +
+      JSON.stringify(options.schema.schema, null, 2)
 
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage && lastMessage.role === 'user') {
+      const updatedLast = { ...lastMessage }
+      if (typeof updatedLast.content === 'string') {
+        updatedLast.content = `${updatedLast.content}\n\n${instruction}`
+      } else if (Array.isArray(updatedLast.content)) {
+        updatedLast.content = [...updatedLast.content, { type: 'text', text: instruction }]
+      } else {
+        updatedLast.content = instruction
+      }
+      messages[messages.length - 1] = updatedLast as ChatMessage
+    } else {
+      messages.push({
+        role: 'user',
+        content: instruction,
+      } satisfies ChatMessage)
+    }
+  }
   const responseFormat: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming['response_format'] =
     useJsonSchema
       ? {
