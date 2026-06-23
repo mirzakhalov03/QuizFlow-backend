@@ -23,7 +23,7 @@ const supportsJsonSchema = (model: string): boolean =>
 /** Strip markdown code fences that some models wrap around JSON output. */
 const stripMarkdownFences = (content: string): string => {
   const trimmed = content.trim()
-  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/)
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i)
   return fenceMatch ? fenceMatch[1].trim() : trimmed
 }
 
