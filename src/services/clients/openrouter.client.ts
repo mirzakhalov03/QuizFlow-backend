@@ -11,6 +11,21 @@ export type JsonSchema = {
   strict?: boolean
 }
 
+/**
+ * Models that do NOT support OpenAI-style `response_format: json_schema`.
+ * For these we fall back to prompt-based JSON enforcement.
+ */
+const JSON_SCHEMA_UNSUPPORTED_PREFIXES = ['anthropic/'] as const
+
+const supportsJsonSchema = (model: string): boolean =>
+  !JSON_SCHEMA_UNSUPPORTED_PREFIXES.some((prefix) => model.startsWith(prefix))
+
+/** Strip markdown code fences that some models wrap around JSON output. */
+const stripMarkdownFences = (content: string): string => {
+  const fenceMatch = content.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/)
+  return fenceMatch ? fenceMatch[1].trim() : content.trim()
+}
+
 export type ChatJsonOptions = {
   model: string
   messages: ChatMessage[]
@@ -55,20 +70,40 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
   if (options.timeoutMs !== undefined) requestOptions.timeout = options.timeoutMs
   if (options.maxRetries !== undefined) requestOptions.maxRetries = options.maxRetries
 
-  try {
-    completion = await client.chat.completions.create(
-      {
-        model: options.model,
-        temperature: options.temperature ?? 0.4,
-        messages: options.messages,
-        response_format: {
+  const useJsonSchema = supportsJsonSchema(options.model)
+  // For models that don't support json_schema, inject a JSON instruction so
+  // they know to respond with raw JSON matching the schema.
+  const messages: ChatMessage[] = useJsonSchema
+    ? options.messages
+    : [
+        ...options.messages,
+        {
+          role: 'user',
+          content:
+            'Respond with ONLY valid raw JSON (no markdown, no code fences) that strictly matches this JSON schema:\n' +
+            JSON.stringify(options.schema.schema, null, 2),
+        } satisfies ChatMessage,
+      ]
+
+  const responseFormat: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming['response_format'] =
+    useJsonSchema
+      ? {
           type: 'json_schema',
           json_schema: {
             name: options.schema.name,
             strict: options.schema.strict ?? true,
             schema: options.schema.schema,
           },
-        },
+        }
+      : { type: 'json_object' }
+
+  try {
+    completion = await client.chat.completions.create(
+      {
+        model: options.model,
+        temperature: options.temperature ?? 0.4,
+        messages,
+        response_format: responseFormat,
       },
       requestOptions,
     )
@@ -100,14 +135,16 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
     )
   }
 
+  const sanitizedContent = stripMarkdownFences(content)
+
   try {
     return {
-      data: JSON.parse(content) as T,
+      data: JSON.parse(sanitizedContent) as T,
       usage: completion.usage,
     }
   } catch (error) {
     throw new AppError('OpenRouter returned non-JSON content', 502, 'OPENROUTER_PARSE_ERROR', {
-      content,
+      content: sanitizedContent,
       error,
     })
   }
