@@ -28,3 +28,8 @@ claude.md
 *.njsproj
 *.sln
 *.sw?
+
+# Test reports and coverage
+playwright-report
+coverage
+test-results
