@@ -77,6 +77,8 @@ jobs:
           ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
           REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
           API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
+          EMAIL_ADDRESS: dummy@email.com
+          EMAIL_APP_PASSWORD: dummyemailpassword
         run: npm run test:coverage
 
       - name: Upload coverage reports
@@ -127,6 +129,9 @@ jobs:
           ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
           REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
           API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
+          EMAIL_ADDRESS: dummy@email.com
+          EMAIL_APP_PASSWORD: dummyemailpassword
+
         run: npm run test:e2e
 
       - name: Upload Playwright Report
