@@ -83,6 +83,7 @@ jobs:
           AWS_BUCKET_NAME: dummybucketname
           AWS_ACCESS_KEY_ID: dummykeyid
           AWS_SECRET_ACCESS_KEY: dummyaccesskey
+          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
         run: npm run test:coverage
 
       - name: Upload coverage reports
@@ -139,6 +140,7 @@ jobs:
           AWS_BUCKET_NAME: dummybucketname
           AWS_ACCESS_KEY_ID: dummykeyid
           AWS_SECRET_ACCESS_KEY: dummyaccesskey
+          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
 
         run: npm run test:e2e
 
