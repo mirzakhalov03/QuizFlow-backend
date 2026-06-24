@@ -62,9 +62,13 @@ const buildSchema = (type?: QuestionType) => ({
           required: ['text', 'type', 'options'],
           properties: {
             text: { type: 'string' },
-            type: type
-              ? { type: 'string', enum: [type] }
-              : { type: 'string', enum: [...QUESTION_TYPES] },
+            type:
+              type && type !== 'mixed'
+                ? { type: 'string', enum: [type] }
+                : {
+                    type: 'string',
+                    enum: QUESTION_TYPES.filter((t) => t !== 'mixed'),
+                  },
             options: {
               type: 'array',
               minItems: 1,
