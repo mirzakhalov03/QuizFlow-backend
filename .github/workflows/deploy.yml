@@ -54,7 +54,6 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
-          APP_URL: ${{ secrets.APP_URL }}
           AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
           API_KEY_ENCRYPTION_SECRET: ${{ secrets.API_KEY_ENCRYPTION_SECRET }}
         run: npm run deploy:lambda
