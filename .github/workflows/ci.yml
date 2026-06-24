@@ -79,6 +79,10 @@ jobs:
           API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
           EMAIL_ADDRESS: dummy@email.com
           EMAIL_APP_PASSWORD: dummyemailpassword
+          AWS_REGION: dummyregion
+          AWS_BUCKET_NAME: dummybucketname
+          AWS_ACCESS_KEY_ID: dummykeyid
+          AWS_SECRET_ACCESS_KEY: dummyaccesskey
         run: npm run test:coverage
 
       - name: Upload coverage reports
@@ -131,6 +135,10 @@ jobs:
           API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
           EMAIL_ADDRESS: dummy@email.com
           EMAIL_APP_PASSWORD: dummyemailpassword
+          AWS_REGION: dummyregion
+          AWS_BUCKET_NAME: dummybucketname
+          AWS_ACCESS_KEY_ID: dummykeyid
+          AWS_SECRET_ACCESS_KEY: dummyaccesskey
 
         run: npm run test:e2e
 
