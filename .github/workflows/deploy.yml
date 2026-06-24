@@ -33,6 +33,13 @@ jobs:
           ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
           REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
           API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
+          EMAIL_ADDRESS: dummy@email.com
+          EMAIL_APP_PASSWORD: dummyemailpassword
+          AWS_REGION: dummyregion
+          AWS_BUCKET_NAME: dummybucketname
+          AWS_ACCESS_KEY_ID: dummykeyid
+          AWS_SECRET_ACCESS_KEY: dummyaccesskey
+          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
         run: npm run test
 
       - name: Compile application
