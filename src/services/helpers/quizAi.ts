@@ -4,7 +4,6 @@ import { DEFAULT_MODEL } from '../../constants/models'
 import type { QuizSource } from '../../helpers/utils/quizLambdaUtils'
 import { buildQuizSystemPrompt } from '../../prompts'
 import type { DifficultyType } from '../../types/difficultyTypes'
-import { QUESTION_TYPES } from '../../types/questionTypes'
 import type { QuestionType } from '../../types/questionTypes'
 import { chatJSON } from '../clients/openrouter.client'
 
@@ -62,9 +61,13 @@ const buildSchema = (type?: QuestionType) => ({
           required: ['text', 'type', 'options'],
           properties: {
             text: { type: 'string' },
-            type: type
-              ? { type: 'string', enum: [type] }
-              : { type: 'string', enum: [...QUESTION_TYPES] },
+            type:
+              type && type !== 'mixed'
+                ? { type: 'string', enum: [type] }
+                : {
+                    type: 'string',
+                    enum: ['multiple_choice', 'multi_select', 'true_false', 'open_ended'],
+                  },
             options: {
               type: 'array',
               minItems: 1,
