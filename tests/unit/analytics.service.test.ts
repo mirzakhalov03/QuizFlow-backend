@@ -110,5 +110,38 @@ describe('AnalyticsService', () => {
       expect(counts.true_false).to.equal(0)
       expect(counts.multi_select).to.equal(0)
     })
+
+    it('should break question types down per folder as well as overall', async () => {
+      // Two folders plus an unfoldered quiz, each contributing question types.
+      const questionTypeRows = [
+        { type: 'multiple_choice', folderId: 'folder-a', count: 5 },
+        { type: 'true_false', folderId: 'folder-a', count: 2 },
+        { type: 'open_ended', folderId: 'folder-b', count: 3 },
+        { type: 'multiple_choice', folderId: null, count: 4 },
+      ]
+
+      queue.push([], [], questionTypeRows)
+
+      const result = await analyticsService.getAnalyticsSummary('user-1')
+
+      // Overall rollup sums across every folder.
+      const all = byType(result.typeBreakdown)
+      expect(all.multiple_choice).to.equal(9)
+      expect(all.true_false).to.equal(2)
+      expect(all.open_ended).to.equal(3)
+
+      const byFolder = Object.fromEntries(
+        result.typeBreakdownByFolder.map((f) => [f.folderId ?? 'null', byType(f.typeBreakdown)]),
+      )
+
+      // Folder A: only its own questions, zero-filled for the rest.
+      expect(byFolder['folder-a'].multiple_choice).to.equal(5)
+      expect(byFolder['folder-a'].true_false).to.equal(2)
+      expect(byFolder['folder-a'].open_ended).to.equal(0)
+      // Folder B and the unfoldered ('null') bucket stay scoped to their quizzes.
+      expect(byFolder['folder-b'].open_ended).to.equal(3)
+      expect(byFolder['folder-b'].multiple_choice).to.equal(0)
+      expect(byFolder['null'].multiple_choice).to.equal(4)
+    })
   })
 })

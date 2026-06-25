@@ -18,6 +18,16 @@ export type TypeBreakdown = {
   questionCount: number
 }
 
+/**
+ * Per-folder question-type breakdown. `folderId` is the folder id, or null for
+ * quizzes with no folder ('Unassigned'). The all-quizzes rollup is the
+ * top-level `typeBreakdown` field, so it is intentionally absent here.
+ */
+export type FolderTypeBreakdown = {
+  folderId: string | null
+  typeBreakdown: TypeBreakdown[]
+}
+
 export type QuizHistoryItem = {
   quizId: string
   quizTitle: string
@@ -65,6 +75,7 @@ export type AnalyticsSummary = {
   averageScore: number
   scoreOverTime: ScorePoint[]
   typeBreakdown: TypeBreakdown[]
+  typeBreakdownByFolder: FolderTypeBreakdown[]
   folderStats: FolderStat[]
   quizStats: QuizStat[]
   history: QuizHistoryItem[]
@@ -110,11 +121,15 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       .where(and(eq(quizJobs.userId, userId), eq(quizJobs.status, 'done'))),
 
     db
-      .select({ type: questions.type, count: sql<number>`count(*)::int` })
+      .select({
+        type: questions.type,
+        folderId: quizzes.folderId,
+        count: sql<number>`count(*)::int`,
+      })
       .from(questions)
       .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
       .where(eq(quizzes.userId, userId))
-      .groupBy(questions.type),
+      .groupBy(questions.type, quizzes.folderId),
   ])
 
   let totalTokensUsed = 0
@@ -187,16 +202,36 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     }))
     .sort((a, b) => b.tokensUsed - a.tokensUsed)
 
-  const questionTypeCounts = new Map<QuestionType, number>(
-    questionTypeRows.map((row) => [row.type, row.count]),
-  )
+  // Roll the per-folder counts up into an all-quizzes total and keep a
+  // per-folder tally so the chart can scope to the selected folder. Folder key
+  // is the folder id, or '' for quizzes with no folder ('Unassigned').
+  const questionTypeCounts = new Map<QuestionType, number>()
+  const folderTypeCounts = new Map<string, Map<QuestionType, number>>()
+  for (const row of questionTypeRows) {
+    questionTypeCounts.set(row.type, (questionTypeCounts.get(row.type) ?? 0) + row.count)
+
+    const folderKey = row.folderId ?? ''
+    const folderCounts = folderTypeCounts.get(folderKey) ?? new Map<QuestionType, number>()
+    folderCounts.set(row.type, (folderCounts.get(row.type) ?? 0) + row.count)
+    folderTypeCounts.set(folderKey, folderCounts)
+  }
+
   // Always send the real question-type slices so the pie chart can zero-fill
   // empties. 'mixed' is a quiz-level type, never a question type, so it is
   // excluded from the per-question breakdown.
-  const typeBreakdown: TypeBreakdown[] = QUESTION_TYPES.filter((type) => type !== 'mixed').map(
-    (type) => ({
+  const allowedQuestionTypes = QUESTION_TYPES.filter((type) => type !== 'mixed')
+  const buildTypeBreakdown = (counts: Map<QuestionType, number>): TypeBreakdown[] =>
+    allowedQuestionTypes.map((type) => ({
       type,
-      questionCount: questionTypeCounts.get(type) ?? 0,
+      questionCount: counts.get(type) ?? 0,
+    }))
+
+  const typeBreakdown: TypeBreakdown[] = buildTypeBreakdown(questionTypeCounts)
+  const typeBreakdownByFolder: FolderTypeBreakdown[] = Array.from(
+    folderTypeCounts,
+    ([folderKey, counts]) => ({
+      folderId: folderKey === '' ? null : folderKey,
+      typeBreakdown: buildTypeBreakdown(counts),
     }),
   )
 
@@ -206,6 +241,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
       averageScore: 0,
       scoreOverTime: [],
       typeBreakdown,
+      typeBreakdownByFolder,
       folderStats: [
         {
           folderId: null,
@@ -331,6 +367,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     averageScore: round(averageScore),
     scoreOverTime,
     typeBreakdown,
+    typeBreakdownByFolder,
     folderStats,
     quizStats,
     history,
