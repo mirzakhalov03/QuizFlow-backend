@@ -219,14 +219,16 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
   // Always send the real question-type slices so the pie chart can zero-fill
   // empties. 'mixed' is a quiz-level type, never a question type, so it is
   // excluded from the per-question breakdown.
+  const allowedQuestionTypes = QUESTION_TYPES.filter((type) => type !== 'mixed')
   const buildTypeBreakdown = (counts: Map<QuestionType, number>): TypeBreakdown[] =>
-    QUESTION_TYPES.filter((type) => type !== 'mixed').map((type) => ({
+    allowedQuestionTypes.map((type) => ({
       type,
       questionCount: counts.get(type) ?? 0,
     }))
 
   const typeBreakdown: TypeBreakdown[] = buildTypeBreakdown(questionTypeCounts)
-  const typeBreakdownByFolder: FolderTypeBreakdown[] = Array.from(folderTypeCounts.entries()).map(
+  const typeBreakdownByFolder: FolderTypeBreakdown[] = Array.from(
+    folderTypeCounts,
     ([folderKey, counts]) => ({
       folderId: folderKey === '' ? null : folderKey,
       typeBreakdown: buildTypeBreakdown(counts),
