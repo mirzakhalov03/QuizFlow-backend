@@ -135,12 +135,8 @@ export const gradeOpenEndedBatch = async (
       ],
     }))
   } catch (err) {
-    // Log structured context so connection errors (status=undefined) are
-    // distinguishable from auth/rate-limit failures (status=401/429).
-    const status = err instanceof OpenAI.APIError ? err.status : undefined
     const message = err instanceof Error ? err.message : String(err)
     logger.error('gradeOpenEndedBatch: LLM call failed', {
-      status,
       message,
       questionCount: rows.length,
     })

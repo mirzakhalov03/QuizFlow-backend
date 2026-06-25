@@ -463,9 +463,15 @@ export const submitPublicQuiz = async (
 
   const review: PublicReviewItem[] = quizQuestions.map((q) => {
     if (q.type === 'open_ended') {
+      let fallbackOpt: (typeof optionRows)[number] | undefined
       const correctOpt =
-        optionRows.find((o) => o.questionId === q.id && o.isCorrect) ??
-        optionRows.find((o) => o.questionId === q.id)
+        optionRows.find((o) => {
+          if (o.questionId === q.id) {
+            if (o.isCorrect) return true
+            if (!fallbackOpt) fallbackOpt = o
+          }
+          return false
+        }) ?? fallbackOpt
       const answered = (answersByQuestion.get(q.id)?.textAnswer?.trim() ?? '').length > 0
       return {
         questionId: q.id,
