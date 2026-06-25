@@ -1,0 +1,59 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [main, master, dev]
+
+jobs:
+  deploy:
+    name: Build, Test and Deploy to AWS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit & integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
+          REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
+          API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
+          EMAIL_ADDRESS: dummy@email.com
+          EMAIL_APP_PASSWORD: dummyemailpassword
+          AWS_REGION: dummyregion
+          AWS_BUCKET_NAME: dummybucketname
+          AWS_ACCESS_KEY_ID: dummykeyid
+          AWS_SECRET_ACCESS_KEY: dummyaccesskey
+          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
+        run: npm run test
+
+      - name: Compile application
+        run: npm run build
+
+      - name: Deploy to AWS Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          LAMBDA_QUIZ_GENERATOR_ARN: ${{ secrets.LAMBDA_QUIZ_GENERATOR_ARN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL: ${{ secrets.DATABASE_SSL }}
+          AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+          API_KEY_ENCRYPTION_SECRET: ${{ secrets.API_KEY_ENCRYPTION_SECRET }}
+        run: npm run deploy:lambda
