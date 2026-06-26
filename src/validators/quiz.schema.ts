@@ -61,7 +61,7 @@ export const GenerateQuizSchema = z
     difficulty: DifficultyTypeEnum.optional(),
 
     apiKeyId: z.uuid().optional(),
-    avoidQuizIds: z.array(z.string().uuid()).optional(),
+    avoidQuizIds: z.array(z.uuid()).max(50, 'Cannot avoid more than 50 quizzes').optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
