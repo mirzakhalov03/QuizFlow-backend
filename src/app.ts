@@ -17,6 +17,7 @@ import byokRoutes from './routes/byok.routes'
 import folderRoutes from './routes/folder.routes'
 import healthRoutes from './routes/health.routes'
 import integrationRoutes from './routes/integrations.routes'
+import marketplaceRoutes from './routes/marketplace.routes'
 import quizRoutes from './routes/quiz.routes'
 import uploadRoutes from './routes/upload.routes'
 import userProfileRoutes from './routes/userProfile.routes'
@@ -47,6 +48,9 @@ app.use(integrationRoutes)
 app.use(healthRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
+// Registered before folderRoutes: folderRoutes applies authMiddleware globally
+// (router.use), which would otherwise intercept the public GET /marketplace routes.
+app.use(marketplaceRoutes)
 app.use(folderRoutes)
 app.use(byokRoutes)
 app.use(analyticsRoutes)

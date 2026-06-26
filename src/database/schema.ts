@@ -14,12 +14,14 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core'
 
+import { MARKETPLACE_CATEGORIES } from '../constants/marketplaceCategories'
 import { DIFFICULTY_TYPES } from '../types/difficultyTypes'
 import { QUESTION_TYPES } from '../types/questionTypes'
 
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'done', 'failed'])
 export const gradingStatusEnum = pgEnum('grading_status', ['complete', 'pending', 'failed'])
 export const difficultyEnum = pgEnum('difficulty', DIFFICULTY_TYPES)
+export const marketplaceCategoryEnum = pgEnum('marketplace_category', MARKETPLACE_CATEGORIES)
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -254,6 +256,58 @@ export const quizJobs = pgTable(
   }),
 )
 
+export const marketplaceListings = pgTable(
+  'marketplace_listings',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .unique()
+      .references(() => quizzes.id, { onDelete: 'cascade' }),
+    description: text('description'),
+    category: marketplaceCategoryEnum('category').notNull(),
+    // Free-text label shown when category is 'other' (capped at 50 chars by the validator).
+    customCategory: text('custom_category'),
+    tags: text('tags').array().notNull().default([]),
+    playCount: integer('play_count').notNull().default(0),
+    ratingSum: integer('rating_sum').notNull().default(0),
+    ratingCount: integer('rating_count').notNull().default(0),
+    listedAt: timestamp('listed_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    categoryIdx: index('marketplace_listings_category_idx').on(table.category),
+    playCountIdx: index('marketplace_listings_play_count_idx').on(table.playCount),
+  }),
+)
+
+export const quizRatings = pgTable(
+  'quiz_ratings',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => quizzes.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    score: integer('score').notNull(),
+    comment: text('comment'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    quizIdIdx: index('quiz_ratings_quiz_id_idx').on(table.quizId),
+    quizUserUnique: unique('quiz_ratings_quiz_user_unique').on(table.quizId, table.userId),
+  }),
+)
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
@@ -361,5 +415,23 @@ export const quizJobsRelations = relations(quizJobs, ({ one }) => ({
   quiz: one(quizzes, {
     fields: [quizJobs.quizId],
     references: [quizzes.id],
+  }),
+}))
+
+export const marketplaceListingsRelations = relations(marketplaceListings, ({ one }) => ({
+  quiz: one(quizzes, {
+    fields: [marketplaceListings.quizId],
+    references: [quizzes.id],
+  }),
+}))
+
+export const quizRatingsRelations = relations(quizRatings, ({ one }) => ({
+  quiz: one(quizzes, {
+    fields: [quizRatings.quizId],
+    references: [quizzes.id],
+  }),
+  user: one(users, {
+    fields: [quizRatings.userId],
+    references: [users.id],
   }),
 }))

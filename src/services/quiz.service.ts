@@ -274,6 +274,11 @@ export const cloneSharedQuiz = async (shareToken: string, userId: string) => {
 
   if (!source) return null
 
+  // You already own the original — no point cloning it into your own library.
+  if (source.userId === userId) {
+    throw new AppError('You cannot save a copy of your own quiz', 400, 'OWN_QUIZ')
+  }
+
   const sourceQuestions = await db
     .select()
     .from(questions)

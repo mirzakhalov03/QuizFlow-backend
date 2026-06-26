@@ -238,6 +238,7 @@ router.get('/public/quizzes/:shareToken', optionalAuthMiddleware, getPublicQuizC
  */
 router.post(
   '/public/quizzes/:shareToken/submit',
+  optionalAuthMiddleware,
   publicSubmitLimiter,
   validate(PublicSubmitSchema),
   submitPublicQuizController,
