@@ -18,6 +18,7 @@ export type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  optionsPerQuestion?: number
   folderId?: string
   apiKeyId?: string
   model?: string
@@ -89,6 +90,7 @@ class NotionQuizService {
         apiKeyId: input.apiKeyId,
         difficulty: input.difficulty,
         model: input.model,
+        optionsPerQuestion: input.optionsPerQuestion,
       })
 
       return {

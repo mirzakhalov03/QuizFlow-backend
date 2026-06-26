@@ -53,6 +53,7 @@ export const GenerateQuizSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
 
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
@@ -174,6 +175,7 @@ export const GenerateQuizFromNotionSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
 
     folderId: z.uuid().optional(),
     apiKeyId: z.uuid().optional(),

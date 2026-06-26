@@ -18,6 +18,7 @@ export type QuizGeneratePayload = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  optionsPerQuestion?: number
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
