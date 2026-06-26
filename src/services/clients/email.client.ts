@@ -24,15 +24,17 @@ type SendEmailOptions = {
   subject: string
   html?: string
   text?: string
+  replyTo?: string
 }
 
-export const sendEmail = async ({ to, subject, html, text }: SendEmailOptions) => {
+export const sendEmail = async ({ to, subject, html, text, replyTo }: SendEmailOptions) => {
   await transporter.sendMail({
     from: `QuizFlow <${emailAddress}>`,
     to,
     subject,
     html,
     text,
+    replyTo,
   })
 }
 

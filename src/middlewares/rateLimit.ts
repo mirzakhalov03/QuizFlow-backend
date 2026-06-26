@@ -51,6 +51,18 @@ export const publicSubmitLimiter = rateLimit({
   },
 })
 
+// Public contact form sends an email per submission — cap by IP to bound spam.
+export const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.ip ? ipKeyGenerator(req.ip) : 'anonymous'),
+  handler: (_req, _res, next) => {
+    next(new AppError('Too many messages, please try again later.', 429, 'RATE_LIMITED'))
+  },
+})
+
 // Tighter protection on code/token verification (brute-force targets).
 // Keyed by IP + identifier (email from body, else authenticated userId).
 export const otpVerifyLimiter = rateLimit({
