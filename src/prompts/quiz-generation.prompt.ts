@@ -20,6 +20,7 @@ export const buildQuizSystemPrompt = (
   count: number,
   userBio?: string | null,
   difficulty?: DifficultyType,
+  avoidQuestions?: string[],
 ) => {
   const typeRule =
     type && type !== 'mixed'
@@ -72,5 +73,13 @@ export const buildQuizSystemPrompt = (
         ]
       : []),
     ...(difficulty ? ['', '## Difficulty', defineDifficultyRule(difficulty)] : []),
+    ...(avoidQuestions && avoidQuestions.length > 0
+      ? [
+          '',
+          '## Existing questions to avoid (DO NOT REPEAT THESE)',
+          'You MUST NOT generate any of the following questions or variations of them that test the exact same concept/fact. The generated questions must be completely different:',
+          ...avoidQuestions.map((q) => `- ${q}`),
+        ]
+      : []),
   ].join('\n')
 }

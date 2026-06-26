@@ -61,6 +61,7 @@ export const GenerateQuizSchema = z
     difficulty: DifficultyTypeEnum.optional(),
 
     apiKeyId: z.uuid().optional(),
+    avoidQuizIds: z.array(z.string().uuid()).optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
@@ -179,6 +180,7 @@ export const GenerateQuizFromNotionSchema = z
     apiKeyId: z.uuid().optional(),
     model: z.enum(SUPPORTED_MODELS).optional(),
     difficulty: DifficultyTypeEnum.optional(),
+    avoidQuizIds: z.array(z.string().uuid()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.isTimerEnabled && !data.timerDuration) {

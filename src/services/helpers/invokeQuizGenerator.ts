@@ -23,6 +23,7 @@ export type QuizGeneratePayload = {
   difficulty?: DifficultyType
   folderId?: string
   apiKeyId?: string
+  avoidQuizIds?: string[]
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env
