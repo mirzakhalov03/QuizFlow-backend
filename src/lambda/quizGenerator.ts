@@ -147,7 +147,7 @@ export const handler = async (event: LambdaEvent) => {
         .from(questions)
         .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
         .where(and(inArray(questions.quizId, event.avoidQuizIds), eq(quizzes.userId, event.userId)))
-      avoidQuestions = dbQuestions.map((q) => q.text)
+      avoidQuestions = [...new Set(dbQuestions.map((q) => q.text))]
     }
 
     const result = event.quiz
