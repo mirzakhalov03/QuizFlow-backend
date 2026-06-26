@@ -223,7 +223,10 @@ export const getPublicQuizByToken = async (shareToken: string, viewerId?: string
     }
     // A partial-object leftJoin select yields all-null fields when no option
     // row matched, so guard on the id before treating it as a real option.
-    if (row.option && row.option.id !== null) q.options.push(row.option as PublicOption)
+    // Open-ended questions should not expose their options (model answers) to public consumers.
+    if (row.option && row.option.id !== null && row.question.type !== 'open_ended') {
+      q.options.push(row.option as PublicOption)
+    }
   }
 
   return {
