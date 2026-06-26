@@ -143,7 +143,7 @@ export const publishListing = async (
       .update(quizzes)
       .set({
         isPublic: true,
-        shareToken: sql.raw('COALESCE(share_token, gen_random_uuid()::text)'),
+        shareToken: sql`COALESCE(share_token, gen_random_uuid()::text)`,
         updatedAt: new Date(),
       })
       .where(eq(quizzes.id, quizId))
@@ -181,14 +181,27 @@ export const updateListing = async (
 ): Promise<ListingCard | null> => {
   if (!(await assertOwnership(userId, quizId))) return null
 
+  const [existing] = await db
+    .select({
+      category: marketplaceListings.category,
+      customCategory: marketplaceListings.customCategory,
+    })
+    .from(marketplaceListings)
+    .where(eq(marketplaceListings.quizId, quizId))
+    .limit(1)
+
+  if (!existing) return null
+
   const set: Record<string, unknown> = { updatedAt: new Date() }
   if (patch.description !== undefined) set.description = patch.description.trim() || null
-  if (patch.category !== undefined) {
-    set.category = patch.category
-    // Reconcile the custom label against whatever category we're moving to.
-    set.customCategory = normalizeCustomCategory(patch.category, patch.customCategory)
-  } else if (patch.customCategory !== undefined) {
-    set.customCategory = patch.customCategory?.trim() || null
+
+  const activeCategory = patch.category !== undefined ? patch.category : existing.category
+  const activeCustomCategory =
+    patch.customCategory !== undefined ? patch.customCategory : existing.customCategory
+
+  if (patch.category !== undefined) set.category = patch.category
+  if (patch.category !== undefined || patch.customCategory !== undefined) {
+    set.customCategory = normalizeCustomCategory(activeCategory, activeCustomCategory)
   }
 
   const [updated] = await db
@@ -334,18 +347,14 @@ export const upsertRating = async (
         set: { score: input.score, comment: input.comment ?? null, updatedAt: new Date() },
       })
 
-    // Recompute the denormalized aggregate on the listing.
-    const [agg] = await tx
-      .select({
-        sum: sql<number>`COALESCE(sum(${quizRatings.score}), 0)`,
-        count: sql<number>`count(*)`,
-      })
-      .from(quizRatings)
-      .where(eq(quizRatings.quizId, quizId))
-
+    // Recompute the denormalized aggregate in one atomic UPDATE to avoid SELECT+UPDATE race conditions.
     await tx
       .update(marketplaceListings)
-      .set({ ratingSum: Number(agg.sum), ratingCount: Number(agg.count), updatedAt: new Date() })
+      .set({
+        ratingSum: sql`(SELECT COALESCE(sum(${quizRatings.score}), 0) FROM ${quizRatings} WHERE ${quizRatings.quizId} = ${quizId})`,
+        ratingCount: sql`(SELECT count(*) FROM ${quizRatings} WHERE ${quizRatings.quizId} = ${quizId})`,
+        updatedAt: new Date(),
+      })
       .where(eq(marketplaceListings.quizId, quizId))
   })
 }
