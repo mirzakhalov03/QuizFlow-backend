@@ -43,6 +43,7 @@ type GenerateOptions = {
   userBio?: string | null
   difficulty?: DifficultyType
   apiKey?: string
+  optionsPerQuestion?: number
   avoidQuestions?: string[]
 }
 
@@ -101,6 +102,7 @@ export const generateQuizFromText = async ({
   userBio,
   difficulty,
   apiKey,
+  optionsPerQuestion,
   avoidQuestions,
 }: GenerateOptions): Promise<AiQuizResult> => {
   const count =
@@ -154,9 +156,20 @@ export const generateQuizFromText = async ({
     messages: [
       {
         role: 'system',
-        content: buildQuizSystemPrompt(type, count, userBio, difficulty, avoidQuestions),
+        content: buildQuizSystemPrompt(
+          type,
+          count,
+          userBio,
+          difficulty,
+          optionsPerQuestion,
+          avoidQuestions,
+        ),
       },
       { role: 'user', content },
+      {
+        role: 'system',
+        content: buildQuizSystemPrompt(type, count, userBio, difficulty, optionsPerQuestion),
+      },
     ],
   })
 

@@ -33,6 +33,7 @@ type LambdaEvent = {
   timerDuration?: number
   type?: string
   questionCount?: number
+  optionsPerQuestion?: number
   model?: string
   quiz?: AiQuiz
   userBio?: string | null
@@ -162,6 +163,7 @@ export const handler = async (event: LambdaEvent) => {
           model: event.model,
           difficulty: event.difficulty,
           apiKey,
+          optionsPerQuestion: event.optionsPerQuestion,
           avoidQuestions,
         })
 

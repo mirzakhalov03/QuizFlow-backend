@@ -48,6 +48,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       difficulty,
       folderId,
       apiKeyId,
+      optionsPerQuestion,
       avoidQuizIds,
     } = req.body as GenerateQuizInput
     if (source === 'notion') {
@@ -68,6 +69,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         apiKeyId,
         model,
         difficulty,
+        optionsPerQuestion,
         avoidQuizIds,
       })
 
@@ -120,6 +122,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       difficulty,
       folderId,
       apiKeyId,
+      optionsPerQuestion,
       avoidQuizIds,
     })
 
