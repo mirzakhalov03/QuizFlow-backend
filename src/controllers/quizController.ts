@@ -49,6 +49,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       folderId,
       apiKeyId,
       optionsPerQuestion,
+      avoidQuizIds,
     } = req.body as GenerateQuizInput
     if (source === 'notion') {
       if (!pageIds || pageIds.length === 0) {
@@ -69,6 +70,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
         model,
         difficulty,
         optionsPerQuestion,
+        avoidQuizIds,
       })
 
       return res.status(202).json(successResponse('Quiz generation started', result))
@@ -121,6 +123,7 @@ export const generateQuizController = async (req: Request, res: Response, next: 
       folderId,
       apiKeyId,
       optionsPerQuestion,
+      avoidQuizIds,
     })
 
     return res.status(202).json(

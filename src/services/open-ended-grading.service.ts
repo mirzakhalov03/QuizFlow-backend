@@ -1,4 +1,5 @@
 import { and, count, eq } from 'drizzle-orm'
+import OpenAI from 'openai'
 
 import { chatJSON } from './clients/openrouter.client'
 import { logger } from '../config/logger'
@@ -18,6 +19,10 @@ type GradeRow = {
 type LlmGrades = { grades: { index: number; isCorrect: boolean }[] }
 
 const GRADING_TIMEOUT_MS = 30_000
+// Number of times the OpenAI SDK will automatically retry on network errors.
+// Transient connection resets are common — 3 retries keeps latency bounded
+// while surviving brief blips without surfacing a grading failure to the user.
+const GRADING_MAX_RETRIES = 3
 
 const GRADE_SCHEMA = {
   name: 'open_ended_grades',
@@ -116,17 +121,27 @@ export const gradeOpenEndedBatch = async (
     )
     .join('\n\n')
 
-  const { data } = await chatJSON<LlmGrades>({
-    model: DEFAULT_MODEL,
-    schema: GRADE_SCHEMA,
-    temperature: 0,
-    timeoutMs: GRADING_TIMEOUT_MS,
-    maxRetries: 1,
-    messages: [
-      { role: 'system', content: OPEN_ENDED_GRADING_SYSTEM_PROMPT },
-      { role: 'user', content: userContent },
-    ],
-  })
+  let data: LlmGrades
+  try {
+    ;({ data } = await chatJSON<LlmGrades>({
+      model: DEFAULT_MODEL,
+      schema: GRADE_SCHEMA,
+      temperature: 0,
+      timeoutMs: GRADING_TIMEOUT_MS,
+      maxRetries: GRADING_MAX_RETRIES,
+      messages: [
+        { role: 'system', content: OPEN_ENDED_GRADING_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+    }))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logger.error('gradeOpenEndedBatch: LLM call failed', {
+      message,
+      questionCount: rows.length,
+    })
+    throw err
+  }
 
   const verdictByIndex = new Map(data.grades.map((g) => [g.index, g.isCorrect]))
   const result = new Map<string, boolean>()

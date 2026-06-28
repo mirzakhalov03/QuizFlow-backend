@@ -1,7 +1,7 @@
 import type { Readable } from 'stream'
 
 import { GetObjectCommand } from '@aws-sdk/client-s3'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 import { getLambdaDb } from './dbClient'
 import { s3Client } from './s3Client'
@@ -40,6 +40,7 @@ type LambdaEvent = {
   difficulty?: DifficultyType
   folderId?: string
   apiKeyId?: string
+  avoidQuizIds?: string[]
 }
 
 const persistQuiz = async (
@@ -140,6 +141,16 @@ export const handler = async (event: LambdaEvent) => {
     let apiKey
     if (event.apiKeyId) apiKey = await getByokById(event.apiKeyId, event.userId, db)
 
+    let avoidQuestions: string[] = []
+    if (event.avoidQuizIds && event.avoidQuizIds.length > 0) {
+      const dbQuestions = await db
+        .select({ text: questions.text })
+        .from(questions)
+        .innerJoin(quizzes, eq(questions.quizId, quizzes.id))
+        .where(and(inArray(questions.quizId, event.avoidQuizIds), eq(quizzes.userId, event.userId)))
+      avoidQuestions = [...new Set(dbQuestions.map((q) => q.text))]
+    }
+
     const result = event.quiz
       ? { quiz: event.quiz }
       : await generateQuizFromText({
@@ -153,6 +164,7 @@ export const handler = async (event: LambdaEvent) => {
           difficulty: event.difficulty,
           apiKey,
           optionsPerQuestion: event.optionsPerQuestion,
+          avoidQuestions,
         })
 
     const quizRow = await persistQuiz(result, event, {

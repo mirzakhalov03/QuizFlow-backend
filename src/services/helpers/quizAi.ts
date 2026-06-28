@@ -44,6 +44,7 @@ type GenerateOptions = {
   difficulty?: DifficultyType
   apiKey?: string
   optionsPerQuestion?: number
+  avoidQuestions?: string[]
 }
 
 const buildSchema = (type?: QuestionType) => ({
@@ -102,6 +103,7 @@ export const generateQuizFromText = async ({
   difficulty,
   apiKey,
   optionsPerQuestion,
+  avoidQuestions,
 }: GenerateOptions): Promise<AiQuizResult> => {
   const count =
     questionCount && questionCount > 0 ? Math.min(questionCount, 30) : DEFAULT_QUESTION_COUNT
@@ -152,7 +154,10 @@ export const generateQuizFromText = async ({
     schema: buildSchema(type),
     temperature: 0.3,
     messages: [
-      { role: 'system', content: buildQuizSystemPrompt(type, count, userBio, difficulty) },
+      {
+        role: 'system',
+        content: buildQuizSystemPrompt(type, count, userBio, difficulty, avoidQuestions),
+      },
       { role: 'user', content },
       {
         role: 'system',

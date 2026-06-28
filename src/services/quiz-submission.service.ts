@@ -413,7 +413,13 @@ export const submitPublicQuiz = async (
     if (q.type !== 'open_ended') continue
     const userText = answersByQuestion.get(q.id)?.textAnswer?.trim()
     if (!userText) continue
-    const correctOpt = optionRows.find((o) => o.questionId === q.id && o.isCorrect)
+    // Prefer the option explicitly flagged isCorrect=true (model answer);
+    // fall back to the first option for this question in case the AI generation
+    // produced an option row without the flag set (prevents empty modelAnswer
+    // from silently breaking the LLM grader).
+    const correctOpt =
+      optionRows.find((o) => o.questionId === q.id && o.isCorrect) ??
+      optionRows.find((o) => o.questionId === q.id)
     openEndedRows.push({
       questionId: q.id,
       questionText: q.text,
@@ -457,7 +463,15 @@ export const submitPublicQuiz = async (
 
   const review: PublicReviewItem[] = quizQuestions.map((q) => {
     if (q.type === 'open_ended') {
-      const correctOpt = optionRows.find((o) => o.questionId === q.id && o.isCorrect)
+      let fallbackOpt: (typeof optionRows)[number] | undefined
+      const correctOpt =
+        optionRows.find((o) => {
+          if (o.questionId === q.id) {
+            if (o.isCorrect) return true
+            if (!fallbackOpt) fallbackOpt = o
+          }
+          return false
+        }) ?? fallbackOpt
       const answered = (answersByQuestion.get(q.id)?.textAnswer?.trim() ?? '').length > 0
       return {
         questionId: q.id,
