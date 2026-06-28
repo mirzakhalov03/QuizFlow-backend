@@ -156,7 +156,14 @@ export const generateQuizFromText = async ({
     messages: [
       {
         role: 'system',
-        content: buildQuizSystemPrompt(type, count, userBio, difficulty, avoidQuestions),
+        content: buildQuizSystemPrompt(
+          type,
+          count,
+          userBio,
+          difficulty,
+          optionsPerQuestion,
+          avoidQuestions,
+        ),
       },
       { role: 'user', content },
       {
