@@ -1,5 +1,4 @@
 import { and, count, eq } from 'drizzle-orm'
-import OpenAI from 'openai'
 
 import { chatJSON } from './clients/openrouter.client'
 import { logger } from '../config/logger'
