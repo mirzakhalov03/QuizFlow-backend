@@ -279,6 +279,19 @@ export const cloneSharedQuiz = async (shareToken: string, userId: string) => {
     throw new AppError('You cannot save a copy of your own quiz', 400, 'OWN_QUIZ')
   }
 
+  // Guard against re-importing the same quiz multiple times.
+  const [existingClone] = await db
+    .select({ id: quizzes.id })
+    .from(quizzes)
+    .where(
+      and(eq(quizzes.userId, userId), sql`${quizzes.properties}->>'sourceQuizId' = ${source.id}`),
+    )
+    .limit(1)
+
+  if (existingClone) {
+    throw new AppError('You have already saved a copy of this quiz', 400, 'ALREADY_IMPORTED')
+  }
+
   const sourceQuestions = await db
     .select()
     .from(questions)
@@ -311,7 +324,7 @@ export const cloneSharedQuiz = async (shareToken: string, userId: string) => {
         type: source.type,
         difficulty: source.difficulty,
         isPublic: false,
-        properties: { generatedBy: 'clone' },
+        properties: { generatedBy: 'clone', sourceQuizId: source.id },
         isTimerEnabled: source.isTimerEnabled,
         timerDuration: source.timerDuration,
         userInstructions: source.userInstructions,
