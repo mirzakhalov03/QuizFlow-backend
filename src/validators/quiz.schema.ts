@@ -53,6 +53,7 @@ export const GenerateQuizSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
 
     /** AI model to use for quiz generation. */
     model: z.enum(SUPPORTED_MODELS as unknown as [string, ...string[]]).optional(),
@@ -61,6 +62,7 @@ export const GenerateQuizSchema = z
     difficulty: DifficultyTypeEnum.optional(),
 
     apiKeyId: z.uuid().optional(),
+    avoidQuizIds: z.array(z.uuid()).max(50, 'Cannot avoid more than 50 quizzes').optional(),
   })
   .superRefine((data, ctx) => {
     const hasFileSource = data.s3Url || data.key || (data.keys && data.keys.length > 0)
@@ -174,11 +176,13 @@ export const GenerateQuizFromNotionSchema = z
     type: QuestionTypeEnum.optional(),
 
     questionCount: z.coerce.number().int().min(1).max(30).optional(),
+    optionsPerQuestion: z.coerce.number().int().min(2).max(6).optional(),
 
     folderId: z.uuid().optional(),
     apiKeyId: z.uuid().optional(),
     model: z.enum(SUPPORTED_MODELS).optional(),
     difficulty: DifficultyTypeEnum.optional(),
+    avoidQuizIds: z.array(z.uuid()).max(50, 'Cannot avoid more than 50 quizzes').optional(),
   })
   .superRefine((data, ctx) => {
     if (data.isTimerEnabled && !data.timerDuration) {

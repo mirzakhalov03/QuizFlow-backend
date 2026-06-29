@@ -18,11 +18,13 @@ export type QuizGeneratePayload = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  optionsPerQuestion?: number
   model?: string
   userBio?: string | null
   difficulty?: DifficultyType
   folderId?: string
   apiKeyId?: string
+  avoidQuizIds?: string[]
 }
 
 const { LAMBDA_QUIZ_GENERATOR_ARN } = process.env

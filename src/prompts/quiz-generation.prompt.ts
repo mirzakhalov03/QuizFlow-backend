@@ -20,7 +20,10 @@ export const buildQuizSystemPrompt = (
   count: number,
   userBio?: string | null,
   difficulty?: DifficultyType,
+  optionsPerQuestion?: number,
+  avoidQuestions?: string[],
 ) => {
+  const optionCount = optionsPerQuestion ?? 4
   const typeRule =
     type && type !== 'mixed'
       ? 'Every question MUST be of type "' + type + '".'
@@ -35,9 +38,10 @@ export const buildQuizSystemPrompt = (
     typeRule,
     '',
     '## Question type constraints',
-    '- "multiple_choice": 4 options, exactly one isCorrect=true.',
-    '- "multi_select": 4–5 options, two or more isCorrect=true.',
-    '- "true_false": exactly two options with the text "True" and "False", exactly one isCorrect=true.',
+    `- "multiple_choice": exactly ${optionCount} options, exactly one isCorrect=true.`,
+    `- "multi_select": exactly ${optionCount} options, two or more isCorrect=true. ALWAYS exactly ${optionCount} options — never more, never fewer.`,
+    `- For mixed quizzes: only "multiple_choice" and "multi_select" questions use exactly ${optionCount} options. "true_false" always uses exactly 2, "open_ended" always uses exactly 1.`,
+    '- "true_false": ALWAYS exactly two options with the text "True" and "False" — never more, never fewer, regardless of any other setting. Exactly one isCorrect=true.',
     '- "open_ended": exactly one option whose text is a concise model answer (2–4 sentences). isCorrect=true. The explanation should describe what key points a complete answer must cover.',
     '',
     '## Question quality',
@@ -72,5 +76,13 @@ export const buildQuizSystemPrompt = (
         ]
       : []),
     ...(difficulty ? ['', '## Difficulty', defineDifficultyRule(difficulty)] : []),
+    ...(avoidQuestions && avoidQuestions.length > 0
+      ? [
+          '',
+          '## Existing questions to avoid (DO NOT REPEAT THESE)',
+          'You MUST NOT generate any of the following questions or variations of them that test the exact same concept/fact. The generated questions must be completely different:',
+          ...avoidQuestions.map((q) => `- ${q}`),
+        ]
+      : []),
   ].join('\n')
 }

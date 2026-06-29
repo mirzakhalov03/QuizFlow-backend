@@ -18,10 +18,12 @@ export type GenerateQuizFromNotionInput = {
   timerDuration?: number
   type?: QuestionType
   questionCount?: number
+  optionsPerQuestion?: number
   folderId?: string
   apiKeyId?: string
   model?: string
   difficulty?: DifficultyType
+  avoidQuizIds?: string[]
 }
 
 const MAX_NOTION_CONTENT_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -89,6 +91,8 @@ class NotionQuizService {
         apiKeyId: input.apiKeyId,
         difficulty: input.difficulty,
         model: input.model,
+        optionsPerQuestion: input.optionsPerQuestion,
+        avoidQuizIds: input.avoidQuizIds,
       })
 
       return {
