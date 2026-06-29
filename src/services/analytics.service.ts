@@ -103,6 +103,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
         correctAnswers: quizResults.correctAnswers,
         folderId: quizzes.folderId,
         folderName: folders.name,
+        quizOwnerId: quizzes.userId,
       })
       .from(quizResults)
       .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
@@ -305,8 +306,13 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
     allFolder.count += 1
     if (percent > allFolder.best) allFolder.best = percent
 
-    const folderKey = r.folderId ?? ''
-    const folderName = r.folderId ? (r.folderName ?? 'Unnamed folder') : 'Unassigned'
+    const isOwnQuiz = r.quizOwnerId === userId
+    const folderKey = isOwnQuiz ? (r.folderId ?? '') : ''
+    const folderName = isOwnQuiz
+      ? r.folderId
+        ? (r.folderName ?? 'Unnamed folder')
+        : 'Unassigned'
+      : 'Unassigned'
     const folderAcc = folderAccs.get(folderKey) ?? { folderName, sum: 0, best: 0, count: 0 }
     folderAcc.sum += percent
     folderAcc.count += 1
@@ -315,7 +321,7 @@ export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSumm
 
     const quizAcc = quizAccs.get(r.quizId) ?? {
       quizTitle: r.quizTitle,
-      folderId: r.folderId ?? null,
+      folderId: r.quizOwnerId === userId ? (r.folderId ?? null) : null,
       sum: 0,
       best: 0,
       count: 0,
