@@ -162,7 +162,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const { limit, offset, search, types, sort, excludeFolderId } =
+    const { limit, offset, search, types, sort, excludeFolderId, status } =
       req.query as unknown as GetQuizzesQuery
 
     const { items, total } = await getQuizzes({
@@ -173,6 +173,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
       types,
       sort,
       excludeFolderId,
+      status,
     })
 
     res.status(200).json(

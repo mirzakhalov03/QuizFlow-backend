@@ -150,6 +150,8 @@ export const GetQuizzesSchema = z.object({
   sort: z.enum(['newest', 'oldest']).default('newest'),
   /** Exclude quizzes that are in a specific folder */
   excludeFolderId: z.string().uuid().optional(),
+  /** Filter by publish/import status */
+  status: z.enum(['published', 'unpublished', 'imported']).optional(),
 })
 
 export type GetQuizzesQuery = z.infer<typeof GetQuizzesSchema>

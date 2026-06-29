@@ -1,7 +1,15 @@
-import { and, asc, desc, eq, ilike, inArray, sql, or, isNull, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, isNotNull, sql, or, isNull, ne } from 'drizzle-orm'
 
 import { db } from '../database/database'
-import { folders, questionOptions, questions, quizJobs, quizzes, users } from '../database/schema'
+import {
+  folders,
+  marketplaceListings,
+  questionOptions,
+  questions,
+  quizJobs,
+  quizzes,
+  users,
+} from '../database/schema'
 import { AppError } from '../helpers/AppError'
 import type { QuestionType } from '../types/questionTypes'
 type GetQuizzesParams = {
@@ -16,6 +24,8 @@ type GetQuizzesParams = {
   sort?: 'newest' | 'oldest'
   /** Exclude quizzes that belong to this folder ID */
   excludeFolderId?: string
+  /** Filter by publish/import status */
+  status?: 'published' | 'unpublished' | 'imported'
 }
 
 type UpdateQuizInput = {
@@ -39,12 +49,22 @@ export const getQuizzes = async ({
   types,
   sort = 'newest',
   excludeFolderId,
+  status,
 }: GetQuizzesParams) => {
   const conditions = [eq(quizzes.userId, userId)]
   if (search) conditions.push(ilike(quizzes.title, `%${search}%`))
   if (types && types.length > 0) conditions.push(inArray(quizzes.type, types))
   if (excludeFolderId)
     conditions.push(or(ne(quizzes.folderId, excludeFolderId), isNull(quizzes.folderId))!)
+  if (status === 'published') conditions.push(isNotNull(marketplaceListings.id))
+  if (status === 'imported') conditions.push(sql`${quizzes.properties}->>'generatedBy' = 'clone'`)
+  if (status === 'unpublished')
+    conditions.push(
+      and(
+        isNull(marketplaceListings.id),
+        sql`(${quizzes.properties}->>'generatedBy' IS DISTINCT FROM 'clone')`,
+      )!,
+    )
 
   const orderBy = sort === 'oldest' ? asc(quizzes.createdAt) : desc(quizzes.createdAt)
 
@@ -68,10 +88,12 @@ export const getQuizzes = async ({
       updatedAt: quizzes.updatedAt,
       apiKeyId: quizJobs.apiKeyId,
       apiKeyName: quizJobs.apiKeyName,
+      isListed: sql<boolean>`(${marketplaceListings.id} IS NOT NULL)`.as('is_listed'),
       total: sql<number>`count(*) OVER()`.as('total'),
     })
     .from(quizzes)
     .leftJoin(quizJobs, eq(quizzes.id, quizJobs.quizId))
+    .leftJoin(marketplaceListings, eq(quizzes.id, marketplaceListings.quizId))
     .where(and(...conditions))
     .orderBy(orderBy)
     .limit(limit)
