@@ -88,7 +88,7 @@ export const getQuizzes = async ({
       updatedAt: quizzes.updatedAt,
       apiKeyId: quizJobs.apiKeyId,
       apiKeyName: quizJobs.apiKeyName,
-      isListed: sql<boolean>`(${marketplaceListings.id} IS NOT NULL)`.as('is_listed'),
+      isPublished: sql<boolean>`(${marketplaceListings.id} IS NOT NULL)`.as('is_published'),
       total: sql<number>`count(*) OVER()`.as('total'),
     })
     .from(quizzes)
