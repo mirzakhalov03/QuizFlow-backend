@@ -134,6 +134,21 @@ export const publishListing = async (
 ): Promise<ListingCard | null> => {
   if (!(await assertOwnership(userId, quizId))) return null
 
+  // Cloned quizzes cannot be listed — the content belongs to the original author.
+  const [quiz] = await db
+    .select({ properties: quizzes.properties })
+    .from(quizzes)
+    .where(eq(quizzes.id, quizId))
+    .limit(1)
+
+  if ((quiz?.properties as { generatedBy?: string } | null)?.generatedBy === 'clone') {
+    throw new AppError(
+      'Imported quizzes cannot be published to the marketplace',
+      403,
+      'CANNOT_PUBLISH_CLONE',
+    )
+  }
+
   const customCategory = normalizeCustomCategory(input.category, input.customCategory)
   const description = input.description?.trim() || null
 
