@@ -26,6 +26,7 @@ export type ListingCard = {
   ratingAvg: number
   ratingCount: number
   isMine: boolean
+  isCloned: boolean
   listedAt: string
 }
 
@@ -58,6 +59,13 @@ const cardColumns = (userId?: string) => ({
   ratingSum: marketplaceListings.ratingSum,
   ratingCount: marketplaceListings.ratingCount,
   isMine: userId ? sql<boolean>`(${quizzes.userId} = ${userId})` : sql<boolean>`false`,
+  isCloned: userId
+    ? sql<boolean>`EXISTS (
+        SELECT 1 FROM quizzes AS cq
+        WHERE cq.user_id = ${userId}
+          AND cq.properties->>'sourceQuizId' = ${marketplaceListings.quizId}::text
+      )`
+    : sql<boolean>`false`,
   listedAt: marketplaceListings.listedAt,
 })
 
@@ -75,6 +83,7 @@ type RawCard = {
   ratingSum: number
   ratingCount: number
   isMine: boolean
+  isCloned: boolean
   listedAt: Date
 }
 
@@ -92,6 +101,7 @@ const toCard = (r: RawCard): ListingCard => ({
   ratingAvg: r.ratingCount > 0 ? Math.round((r.ratingSum / r.ratingCount) * 100) / 100 : 0,
   ratingCount: r.ratingCount,
   isMine: Boolean(r.isMine),
+  isCloned: Boolean(r.isCloned),
   listedAt: r.listedAt.toISOString(),
 })
 
