@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 
 import { incrementPlayCount } from './marketplace.service'
 import {
@@ -140,9 +140,9 @@ export const submitQuiz = async (
 ) => {
   logger.info('Submitting quiz', { quizId, userId, answerCount: rawAnswers.length })
   const [quiz] = await db
-    .select({ id: quizzes.id })
+    .select({ id: quizzes.id, userId: quizzes.userId })
     .from(quizzes)
-    .where(and(eq(quizzes.id, quizId), eq(quizzes.userId, userId)))
+    .where(and(eq(quizzes.id, quizId), or(eq(quizzes.userId, userId), eq(quizzes.isPublic, true))))
     .limit(1)
 
   if (!quiz) {
@@ -278,12 +278,20 @@ export const submitQuiz = async (
       })
       .returning()
 
-    await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
+    // completedAt is owner-scoped — don't overwrite it for a non-owner take.
+    if (quiz.userId === userId) {
+      await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
+    }
 
     return resultRow
   })
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
+
+  // Bump marketplace play count for non-owner takes (mirrors the public-submit path).
+  if (quiz.userId !== userId) {
+    await incrementPlayCount(quizId).catch(() => {})
+  }
 
   // Grade open-ended answers synchronously so the response carries the final
   // score. In-process fire-and-forget didn't survive on serverless — the host

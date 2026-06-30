@@ -121,7 +121,7 @@ export const getQuizById = async (id: string, userId: string) => {
     .leftJoin(quizJobs, eq(quizzes.id, quizJobs.quizId))
     .leftJoin(questions, eq(questions.quizId, quizzes.id))
     .leftJoin(questionOptions, eq(questionOptions.questionId, questions.id))
-    .where(and(eq(quizzes.id, id), eq(quizzes.userId, userId)))
+    .where(and(eq(quizzes.id, id), or(eq(quizzes.userId, userId), eq(quizzes.isPublic, true))))
     .orderBy(asc(questions.position), asc(questionOptions.position))
 
   if (rows.length === 0) return null
