@@ -1,12 +1,36 @@
 name: CI Pipeline
+
+env:
+  # Single source of truth for Node version — change here to update all jobs.
+  NODE_VERSION: '20'
+
+  # ── Shared test environment ──────────────────────────────────────────────────
+  # These values satisfy env-schema validation during tests. The database and
+  # all AWS services are fully mocked; none of these values grant real access.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
+  REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
+  API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
+  EMAIL_ADDRESS: dummy@email.com
+  EMAIL_APP_PASSWORD: dummyemailpassword
+  AWS_REGION: us-east-1
+  AWS_BUCKET_NAME: dummy-bucket-name
+  # Intentionally fake — do not match real AWS key formats and grant no access.
+  AWS_ACCESS_KEY_ID: dummykeyid
+  AWS_SECRET_ACCESS_KEY: dummyaccesskey
+  LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
+
 on:
   push:
-    branches: [dev]
+    # Run CI on all long-lived branches, not just dev.
+    branches: [main, master, dev]
   pull_request:
     branches: [main, master, dev]
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
+
 jobs:
   lint-and-format:
     name: Lint & Format Check
@@ -15,15 +39,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
       - name: Check code formatting
         run: npm run format:check
+
       - name: Run linter
         run: npm run lint
 
@@ -31,20 +59,34 @@ jobs:
     name: Build & Compile TypeScript
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Lint must pass before we spend time compiling.
+    needs: lint-and-format
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
       - name: Compile application
         run: npm run build
+
       - name: Build Lambda packages
         run: npm run build:lambda
+
+      - name: Upload compiled output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          # Only needed within this workflow run; 1 day is sufficient.
+          retention-days: 1
 
   unit-and-integration-tests:
     name: Unit & Integration Tests
@@ -54,29 +96,28 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Download compiled output
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Run tests with Vitest
-        env:
-          # DB is fully mocked in tests; this value is required by env validation but unused
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
-          REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
-          API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
-          EMAIL_ADDRESS: dummy@email.com
-          EMAIL_APP_PASSWORD: dummyemailpassword
-          AWS_REGION: dummyregion
-          AWS_BUCKET_NAME: dummybucketname
-          AWS_ACCESS_KEY_ID: dummykeyid
-          AWS_SECRET_ACCESS_KEY: dummyaccesskey
-          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
         run: npm run test:coverage
+
       - name: Upload coverage reports
+        # Upload on both success and failure so coverage is always available.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -91,43 +132,45 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Download compiled output
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Get Playwright Version
         id: playwright-version
+        # Runs after npm ci, so @playwright/test is guaranteed to be present.
         run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
+
       - name: Cache Playwright Browsers
         id: cache-playwright
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.PLAYWRIGHT_VERSION }}
+
       - name: Install Playwright Browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
       - name: Install Playwright OS Dependencies (if cache hit)
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
+
       - name: Run Playwright E2E tests
-        env:
-          # DB is fully mocked in tests; this value is required by env validation but unused
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          ACCESS_TOKEN_SECRET: dummy-access-token-secret-for-testing
-          REFRESH_TOKEN_SECRET: dummy-refresh-token-secret-for-testing
-          API_KEY_ENCRYPTION_SECRET: dummy-api-key-encryption-secret-for-testing
-          EMAIL_ADDRESS: dummy@email.com
-          EMAIL_APP_PASSWORD: dummyemailpassword
-          AWS_REGION: dummyregion
-          AWS_BUCKET_NAME: dummybucketname
-          AWS_ACCESS_KEY_ID: dummykeyid
-          AWS_SECRET_ACCESS_KEY: dummyaccesskey
-          LAMBDA_QUIZ_GENERATOR_ARN: dummyvalue
         run: npm run test:e2e
+
       - name: Upload Playwright Report
         if: failure()
         uses: actions/upload-artifact@v4
