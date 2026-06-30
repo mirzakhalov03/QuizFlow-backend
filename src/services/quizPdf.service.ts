@@ -39,6 +39,37 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+/** Parses markdown-style code blocks and inline code, escaping HTML safely. */
+function formatMarkdown(text: string | null | undefined): string {
+  if (!text) return ''
+
+  const parts = text.split(/(```[\s\S]*?```)/g)
+
+  return parts
+    .map((part) => {
+      if (part.startsWith('```')) {
+        const match = part.match(/```(\w*)\n?([\s\S]*?)```/)
+        if (match) {
+          const language = match[1] || 'text'
+          const code = match[2]
+          return `<pre><code class="language-${escapeHtml(language)}">${escapeHtml(code.trim())}</code></pre>`
+        }
+      }
+
+      const inlineParts = part.split(/(`[^`]+`)/g)
+      return inlineParts
+        .map((inlinePart) => {
+          if (inlinePart.startsWith('`') && inlinePart.endsWith('`')) {
+            const code = inlinePart.slice(1, -1)
+            return `<code class="inline-code">${escapeHtml(code)}</code>`
+          }
+          return escapeHtml(inlinePart)
+        })
+        .join('')
+    })
+    .join('')
+}
+
 function renderQuestion(question: PdfQuestion, index: number, withAnswers = true): string {
   const typeLabel = TYPE_LABEL[question.type] ?? question.type
 
@@ -49,13 +80,13 @@ function renderQuestion(question: PdfQuestion, index: number, withAnswers = true
       <article class="question">
         <div class="q-head">
           <span class="q-num">${index + 1}</span>
-          <span class="q-text">${escapeHtml(question.text)}</span>
+          <span class="q-text">${formatMarkdown(question.text)}</span>
           <span class="q-type">${escapeHtml(typeLabel)}</span>
         </div>
         <div class="answer-lines"></div>
         ${
           withAnswers && suggestedText
-            ? `<div class="suggested"><span class="suggested-label">Suggested answer</span>${escapeHtml(
+            ? `<div class="suggested"><span class="suggested-label">Suggested answer</span>${formatMarkdown(
                 suggestedText,
               )}</div>`
             : ''
@@ -69,13 +100,13 @@ function renderQuestion(question: PdfQuestion, index: number, withAnswers = true
       const marker = withAnswers && option.isCorrect ? '✓' : ''
       const explanation =
         withAnswers && option.explanation
-          ? `<div class="explanation">${escapeHtml(option.explanation)}</div>`
+          ? `<div class="explanation">${formatMarkdown(option.explanation)}</div>`
           : ''
       return `
         <li class="option${correctClass}">
           <span class="option-marker">${marker}</span>
           <div class="option-body">
-            <span class="option-text">${escapeHtml(option.text)}</span>
+            <span class="option-text">${formatMarkdown(option.text)}</span>
             ${explanation}
           </div>
         </li>`
@@ -86,7 +117,7 @@ function renderQuestion(question: PdfQuestion, index: number, withAnswers = true
     <article class="question">
       <div class="q-head">
         <span class="q-num">${index + 1}</span>
-        <span class="q-text">${escapeHtml(question.text)}</span>
+        <span class="q-text">${formatMarkdown(question.text)}</span>
         <span class="q-type">${escapeHtml(typeLabel)}</span>
       </div>
       <ul class="options">${options}</ul>
@@ -109,6 +140,7 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
   <head>
     <meta charset="utf-8" />
     <title>${escapeHtml(quiz.title)}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
     <style>
       * { box-sizing: border-box; }
       body {
@@ -127,7 +159,7 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
         background: #eef2ff; color: #4338ca; font-weight: 700;
         display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
       }
-      .q-text { flex: 1; font-weight: 600; }
+      .q-text { flex: 1; font-weight: 600; min-width: 0; }
       .q-type {
         flex: 0 0 auto; color: #6b7280; font-size: 10px; text-transform: uppercase;
         letter-spacing: 0.04em; padding-top: 2px;
@@ -139,7 +171,7 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
       }
       .option--correct { border-color: #10b981; background: #ecfdf5; }
       .option-marker { flex: 0 0 14px; color: #059669; font-weight: 700; }
-      .option-body { flex: 1; }
+      .option-body { flex: 1; min-width: 0; }
       .explanation { color: #6b7280; font-size: 11px; margin-top: 4px; }
       .answer-lines {
         margin: 4px 0 0 28px; height: 70px;
@@ -155,7 +187,42 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
         display: block; color: #4338ca; font-weight: 700; text-transform: uppercase;
         font-size: 10px; letter-spacing: 0.04em; margin-bottom: 2px;
       }
+      pre {
+        margin: 8px 0;
+        padding: 10px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+      }
+      pre code {
+        background: transparent !important;
+        padding: 0 !important;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+      }
+      .inline-code {
+        background: #f3f4f6;
+        color: #1f2933;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-size: 9.5px;
+      }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        if (typeof hljs !== 'undefined') {
+          hljs.highlightAll();
+        }
+        document.body.classList.add('hljs-loaded');
+      });
+    </script>
   </head>
   <body>
     <h1>${escapeHtml(quiz.title)}</h1>
@@ -183,6 +250,7 @@ export async function generateQuizPdf(quiz: PdfQuiz, withAnswers = true): Promis
   const page = await browser.newPage()
   try {
     await page.setContent(buildQuizHtml(quiz, withAnswers), { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('.hljs-loaded', { timeout: 5000 }).catch(() => {})
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
