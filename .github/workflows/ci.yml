@@ -2,7 +2,7 @@ name: CI Pipeline
 
 env:
   # Single source of truth for Node version — change here to update all jobs.
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
   # ── Shared test environment ──────────────────────────────────────────────────
   # These values satisfy env-schema validation during tests. The database and
