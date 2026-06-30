@@ -1,3 +1,4 @@
+import hljs from 'highlight.js'
 import puppeteer from 'puppeteer'
 
 import type { QuestionType } from '../types/questionTypes'
@@ -39,7 +40,29 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-/** Parses markdown-style code blocks and inline code, escaping HTML safely. */
+/**
+ * Highlight a fenced code block server-side using highlight.js.
+ * Falls back to plain escaped text if the language is unknown.
+ */
+function highlightCode(code: string, language: string): string {
+  const trimmed = code.trim()
+  try {
+    if (language && hljs.getLanguage(language)) {
+      return hljs.highlight(trimmed, { language }).value
+    }
+    // Unknown or missing language — let hljs auto-detect.
+    return hljs.highlightAuto(trimmed).value
+  } catch {
+    // Fallback: plain escaped text, no highlighting.
+    return escapeHtml(trimmed)
+  }
+}
+
+/**
+ * Parses markdown-style code blocks and inline code.
+ * Fenced blocks are syntax-highlighted server-side so Puppeteer needs no
+ * external scripts or network requests.
+ */
 function formatMarkdown(text: string | null | undefined): string {
   if (!text) return ''
 
@@ -50,9 +73,10 @@ function formatMarkdown(text: string | null | undefined): string {
       if (part.startsWith('```')) {
         const match = part.match(/```(\w*)\n?([\s\S]*?)```/)
         if (match) {
-          const language = match[1] || 'text'
-          const code = match[2]
-          return `<pre><code class="language-${escapeHtml(language)}">${escapeHtml(code.trim())}</code></pre>`
+          const language = match[1] || ''
+          const highlighted = highlightCode(match[2], language)
+          const langAttr = language ? ` class="language-${escapeHtml(language)}"` : ''
+          return `<pre><code${langAttr}>${highlighted}</code></pre>`
         }
       }
 
@@ -140,8 +164,12 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
   <head>
     <meta charset="utf-8" />
     <title>${escapeHtml(quiz.title)}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
     <style>
+      /* ── highlight.js github theme (inlined from node_modules) ─────────── */
+      pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}
+      .hljs{color:#24292e;background:#fff}.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_{color:#d73a49}.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}.hljs-meta .hljs-string,.hljs-regexp,.hljs-string{color:#032f62}.hljs-built_in,.hljs-symbol{color:#e36209}.hljs-code,.hljs-comment,.hljs-formula{color:#6a737d}.hljs-name,.hljs-quote,.hljs-selector-pseudo,.hljs-selector-tag{color:#22863a}.hljs-subst{color:#24292e}.hljs-section{color:#005cc5;font-weight:700}.hljs-bullet{color:#735c0f}.hljs-emphasis{color:#24292e;font-style:italic}.hljs-strong{color:#24292e;font-weight:700}.hljs-addition{color:#22863a;background-color:#f0fff4}.hljs-deletion{color:#b31d28;background-color:#ffeef0}
+
+      /* ── document styles ─────────────────────────────────────────────────── */
       * { box-sizing: border-box; }
       body {
         font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -190,7 +218,7 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
       pre {
         margin: 8px 0;
         padding: 10px;
-        background: #f3f4f6;
+        background: #f8f9fa;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
         overflow-x: auto;
@@ -200,6 +228,7 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
       pre code {
         background: transparent !important;
         padding: 0 !important;
+        font-size: 10px;
       }
       code {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -214,15 +243,6 @@ export function buildQuizHtml(quiz: PdfQuiz, withAnswers = true): string {
         font-size: 9.5px;
       }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        if (typeof hljs !== 'undefined') {
-          hljs.highlightAll();
-        }
-        document.body.classList.add('hljs-loaded');
-      });
-    </script>
   </head>
   <body>
     <h1>${escapeHtml(quiz.title)}</h1>
@@ -249,8 +269,9 @@ export async function generateQuizPdf(quiz: PdfQuiz, withAnswers = true): Promis
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
+    // HTML is fully self-contained (no external assets), so domcontentloaded
+    // is sufficient — no selector wait needed.
     await page.setContent(buildQuizHtml(quiz, withAnswers), { waitUntil: 'domcontentloaded' })
-    await page.waitForSelector('.hljs-loaded', { timeout: 5000 }).catch(() => {})
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
