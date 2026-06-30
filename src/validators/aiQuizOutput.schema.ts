@@ -47,12 +47,20 @@ const refineOptions = (
 
   const correctCount = options.filter((o) => o.isCorrect).length
 
-  if (questionType === 'multiple_choice' || questionType === 'multi_select') {
+  if (questionType === 'multiple_choice') {
+    if (correctCount !== 1) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...pathPrefix],
+        message: 'multiple_choice must have exactly 1 correct option, got ' + correctCount,
+      })
+    }
+  } else if (questionType === 'multi_select') {
     if (correctCount === 0) {
       ctx.addIssue({
         code: 'custom',
         path: [...pathPrefix],
-        message: `${questionType} must have at least 1 correct option, got ${correctCount}`,
+        message: 'multi_select must have at least 1 correct option, got ' + correctCount,
       })
     }
   }
