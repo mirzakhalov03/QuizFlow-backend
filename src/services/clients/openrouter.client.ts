@@ -55,9 +55,20 @@ export const extractJsonString = (content: string): string => {
     if (isLikelyJson(candidate)) return candidate
   }
 
-  // ── Strategy 3: extract outermost {...} by brace-walking ────────────────
-  const start = trimmed.indexOf('{')
+  // ── Strategy 3: extract outermost {...} or [...] by bracket-walking ───────
+  // Supports both JSON objects and top-level JSON arrays.
+  const objectStart = trimmed.indexOf('{')
+  const arrayStart = trimmed.indexOf('[')
+  const start =
+    objectStart === -1
+      ? arrayStart
+      : arrayStart === -1
+        ? objectStart
+        : Math.min(objectStart, arrayStart)
+
   if (start !== -1) {
+    const openBracket = trimmed[start]
+    const closeBracket = openBracket === '{' ? '}' : ']'
     let depth = 0
     let inString = false
     let escape = false
@@ -79,8 +90,8 @@ export const extractJsonString = (content: string): string => {
       }
       if (inString) continue
 
-      if (ch === '{') depth++
-      else if (ch === '}') {
+      if (ch === openBracket) depth++
+      else if (ch === closeBracket) {
         depth--
         if (depth === 0) {
           const candidate = trimmed.slice(start, i + 1)
@@ -95,8 +106,15 @@ export const extractJsonString = (content: string): string => {
   return trimmed
 }
 
-/** Quick heuristic: does this string look like a JSON object? */
-const isLikelyJson = (s: string): boolean => s.startsWith('{') && s.endsWith('}')
+/**
+ * Quick heuristic: does this string look like a JSON object or array?
+ *
+ * NOTE: This intentionally does NOT call JSON.parse to avoid double-parsing
+ * on the hot path. It can pass for malformed strings like `{ garbage }` —
+ * callers that need strict validation should parse the candidate themselves.
+ */
+const isLikelyJson = (s: string): boolean =>
+  (s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))
 
 export type ChatJsonOptions = {
   model: string
@@ -108,6 +126,9 @@ export type ChatJsonOptions = {
   maxRetries?: number
 }
 
+/** Cache of OpenAI client instances keyed by API key to avoid re-allocating per request. */
+const clientCache = new Map<string, OpenAI>()
+
 const getClient = (apiKey?: string) => {
   const key = apiKey ?? process.env.OPENROUTER_API_KEY
 
@@ -115,14 +136,19 @@ const getClient = (apiKey?: string) => {
     throw new AppError('OPENROUTER_API_KEY is not configured', 500, 'CONFIG_ERROR')
   }
 
-  return new OpenAI({
+  if (clientCache.has(key)) return clientCache.get(key)!
+
+  const client = new OpenAI({
     apiKey: key,
     baseURL: 'https://openrouter.ai/api/v1',
     defaultHeaders: {
       'HTTP-Referer': process.env.APP_URL ?? 'http://localhost:3000',
-      'X-Title': 'QuizFlow',
+      'X-Title': process.env.APP_TITLE ?? 'QuizFlow',
     },
   })
+
+  clientCache.set(key, client)
+  return client
 }
 
 export type ChatJsonResult<T> = {
@@ -260,6 +286,8 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
     }
 
     try {
+      // NOTE: json_schema path skips extractJsonString intentionally — the API
+      // enforces the schema so the content is guaranteed to be clean JSON.
       return { data: JSON.parse(content) as T, usage: completion.usage }
     } catch (error) {
       throw new AppError('OpenRouter returned non-JSON content', 502, 'OPENROUTER_PARSE_ERROR', {
@@ -343,13 +371,32 @@ export const chatJSON = async <T>(options: ChatJsonOptions): Promise<ChatJsonRes
   const retryParsed = tryParseContent<T>(retryCompletion)
   if (retryParsed !== null) {
     logger.info('[openrouter] json_object rescue retry succeeded', { model: options.model })
-    return { data: retryParsed, usage: retryCompletion.usage }
+    // Merge token usage from both the failed first attempt and the successful retry.
+    const mergedUsage: OpenAI.CompletionUsage | undefined =
+      firstCompletion.usage && retryCompletion.usage
+        ? {
+            prompt_tokens:
+              firstCompletion.usage.prompt_tokens + retryCompletion.usage.prompt_tokens,
+            completion_tokens:
+              firstCompletion.usage.completion_tokens + retryCompletion.usage.completion_tokens,
+            total_tokens: firstCompletion.usage.total_tokens + retryCompletion.usage.total_tokens,
+          }
+        : (retryCompletion.usage ?? firstCompletion.usage)
+    return { data: retryParsed, usage: mergedUsage }
   }
 
-  // Both attempts failed — surface with enough detail to diagnose.
-  throw new AppError('OpenRouter returned non-JSON content', 502, 'OPENROUTER_PARSE_ERROR', {
-    model: options.model,
-    firstRaw: firstRaw.slice(0, 500),
-    retryRaw: retryRaw.slice(0, 500),
-  })
+  // Both attempts failed — the model did not adhere to the JSON schema rules
+  // even after an explicit self-correction retry.
+  throw new AppError(
+    `Model "${options.model}" did not adhere to the required JSON schema after two attempts. ` +
+      'Try again or switch to a another model',
+    502,
+    'OPENROUTER_PARSE_ERROR',
+    {
+      model: options.model,
+      schemaName: options.schema.name,
+      firstRaw: firstRaw.slice(0, 500),
+      retryRaw: retryRaw.slice(0, 500),
+    },
+  )
 }
