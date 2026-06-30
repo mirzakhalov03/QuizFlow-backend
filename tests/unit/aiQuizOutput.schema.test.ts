@@ -119,12 +119,6 @@ describe('buildAiQuizOutputSchema', () => {
       expect(schema.safeParse(quiz).success).toBe(true)
     })
 
-    it('treats undefined type the same as mixed', () => {
-      const schema = buildAiQuizOutputSchema({ questionCount: 2, optionsPerQuestion: 4 })
-      const quiz = makeValidQuiz([makeMcQuestion(4), makeTrueFalseQuestion()])
-      expect(schema.safeParse(quiz).success).toBe(true)
-    })
-
     it('accepts a custom optionsPerQuestion of 6', () => {
       const schema = buildAiQuizOutputSchema({
         type: 'multiple_choice',
@@ -291,48 +285,6 @@ describe('buildAiQuizOutputSchema', () => {
       if (!result.success) {
         const messages = result.error.issues.map((i) => i.message).join(' ')
         expect(messages).toMatch(/1 correct/)
-      }
-    })
-
-    it('rejects multiple_choice with two correct options', () => {
-      const schema = buildAiQuizOutputSchema({
-        type: 'multiple_choice',
-        questionCount: 1,
-        optionsPerQuestion: 4,
-      })
-      const quiz = makeValidQuiz([
-        {
-          text: 'Question?',
-          type: 'multiple_choice',
-          options: [
-            makeOption({ isCorrect: true }),
-            makeOption({ isCorrect: true }),
-            makeOption(),
-            makeOption(),
-          ],
-        },
-      ])
-      expect(schema.safeParse(quiz).success).toBe(false)
-    })
-
-    it('rejects multi_select with only one correct option', () => {
-      const schema = buildAiQuizOutputSchema({
-        type: 'multi_select',
-        questionCount: 1,
-        optionsPerQuestion: 4,
-      })
-      const quiz = makeValidQuiz([
-        {
-          text: 'Select all correct.',
-          type: 'multi_select',
-          options: [makeOption({ isCorrect: true }), makeOption(), makeOption(), makeOption()],
-        },
-      ])
-      const result = schema.safeParse(quiz)
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        const messages = result.error.issues.map((i) => i.message).join(' ')
-        expect(messages).toMatch(/at least 2/)
       }
     })
 

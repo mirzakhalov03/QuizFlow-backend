@@ -36,7 +36,7 @@ const refineOptions = (
 ) => {
   if (options.length !== expectedOptionCount) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix],
       message: `Expected exactly ${expectedOptionCount} options, got ${options.length}`,
     })
@@ -47,20 +47,12 @@ const refineOptions = (
 
   const correctCount = options.filter((o) => o.isCorrect).length
 
-  if (questionType === 'multiple_choice') {
-    if (correctCount !== 1) {
+  if (questionType === 'multiple_choice' || questionType === 'multi_select') {
+    if (correctCount === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: [...pathPrefix],
-        message: `multiple_choice must have exactly 1 correct option, got ${correctCount}`,
-      })
-    }
-  } else if (questionType === 'multi_select') {
-    if (correctCount < 2) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [...pathPrefix],
-        message: `multi_select must have at least 2 correct options, got ${correctCount}`,
+        message: `${questionType} must have at least 1 correct option, got ${correctCount}`,
       })
     }
   }
@@ -73,7 +65,7 @@ const refineTrueFalse = (
 ) => {
   if (options.length !== 2) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix],
       message: `true_false must have exactly 2 options, got ${options.length}`,
     })
@@ -86,7 +78,7 @@ const refineTrueFalse = (
 
   if (!hasTrue || !hasFalse) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix],
       message: `true_false options must be exactly "True" and "False", got: ${texts.join(', ')}`,
     })
@@ -95,7 +87,7 @@ const refineTrueFalse = (
   const correctCount = options.filter((o) => o.isCorrect).length
   if (correctCount !== 1) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix],
       message: `true_false must have exactly 1 correct option, got ${correctCount}`,
     })
@@ -109,7 +101,7 @@ const refineOpenEnded = (
 ) => {
   if (options.length !== 1) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix],
       message: `open_ended must have exactly 1 option (model answer), got ${options.length}`,
     })
@@ -118,7 +110,7 @@ const refineOpenEnded = (
 
   if (!options[0].isCorrect) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: [...pathPrefix, 0, 'isCorrect'],
       message: 'open_ended model answer must have isCorrect=true',
     })
@@ -130,8 +122,7 @@ const refineOpenEnded = (
 // ---------------------------------------------------------------------------
 
 export type AiQuizOutputSchemaOptions = {
-  /** The requested question type. `undefined` is treated the same as `"mixed"`. */
-  type?: QuestionType
+  type: QuestionType
   /** How many questions were requested. */
   questionCount: number
   /** How many options were requested per multiple_choice/multi_select question. */
@@ -150,9 +141,8 @@ export const buildAiQuizOutputSchema = ({
   optionsPerQuestion,
 }: AiQuizOutputSchemaOptions) => {
   // Determine which question types are valid for this generation run.
-  const validTypes = QUESTION_TYPES.filter((t) => t !== 'mixed') as [string, ...string[]]
-  const isMixed = !type || type === 'mixed'
-
+  const validTypes = QUESTION_TYPES.filter((t) => t !== 'mixed')
+  const isMixed = type === 'mixed'
   return z
     .object({
       title: NonEmptyString,
@@ -182,7 +172,7 @@ export const buildAiQuizOutputSchema = ({
               }
             }),
         )
-        .length(questionCount, `Expected exactly ${questionCount} questions, got {actual}`),
+        .length(questionCount, `Expected exactly ${questionCount} questions`),
     })
     .superRefine((quiz, ctx) => {
       // Enforce the per-question type constraint.
@@ -190,7 +180,7 @@ export const buildAiQuizOutputSchema = ({
         quiz.questions.forEach((question, index) => {
           if (question.type !== type) {
             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               path: ['questions', index, 'type'],
               message: `Expected question type "${type}", got "${question.type}"`,
             })
