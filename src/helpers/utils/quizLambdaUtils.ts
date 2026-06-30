@@ -8,8 +8,7 @@ import type { QuestionType } from '../../types/questionTypes'
 export const QUIZ_FILE_MAX_BYTES = 25 * 1024 * 1024
 
 export type QuizSource =
-  | { kind: 'text'; text: string }
-  | { kind: 'pdf'; buffer: Buffer; filename: string }
+  { kind: 'text'; text: string } | { kind: 'pdf'; buffer: Buffer; filename: string }
 
 export const streamToBuffer = async (stream: Readable, maxBytes?: number): Promise<Buffer> => {
   const chunks: Buffer[] = []

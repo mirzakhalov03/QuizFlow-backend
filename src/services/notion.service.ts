@@ -68,8 +68,7 @@ class NotionService {
       .map((page) => {
         // Find the property of type 'title' (Notion pages always have exactly one)
         const titleProp = Object.values(page.properties).find((prop) => prop.type === 'title') as
-          | Extract<PageObjectResponse['properties'][string], { type: 'title' }>
-          | undefined
+          Extract<PageObjectResponse['properties'][string], { type: 'title' }> | undefined
 
         const title = titleProp?.title?.[0]?.plain_text || 'Untitled'
 
