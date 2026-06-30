@@ -72,9 +72,9 @@ const refineTrueFalse = (
     return
   }
 
-  const texts = options.map((o) => o.text)
-  const hasTrue = texts.includes('True')
-  const hasFalse = texts.includes('False')
+  const texts = options.map((o) => o.text.toLocaleLowerCase())
+  const hasTrue = texts.includes('true')
+  const hasFalse = texts.includes('false')
 
   if (!hasTrue || !hasFalse) {
     ctx.addIssue({
