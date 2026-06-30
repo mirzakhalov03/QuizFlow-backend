@@ -1,5 +1,6 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 
+import { incrementPlayCount } from './marketplace.service'
 import {
   gradeOpenEndedAnswers,
   gradeOpenEndedBatch,
@@ -139,9 +140,9 @@ export const submitQuiz = async (
 ) => {
   logger.info('Submitting quiz', { quizId, userId, answerCount: rawAnswers.length })
   const [quiz] = await db
-    .select({ id: quizzes.id })
+    .select({ id: quizzes.id, userId: quizzes.userId })
     .from(quizzes)
-    .where(and(eq(quizzes.id, quizId), eq(quizzes.userId, userId)))
+    .where(and(eq(quizzes.id, quizId), or(eq(quizzes.userId, userId), eq(quizzes.isPublic, true))))
     .limit(1)
 
   if (!quiz) {
@@ -277,12 +278,20 @@ export const submitQuiz = async (
       })
       .returning()
 
-    await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
+    // completedAt is owner-scoped — don't overwrite it for a non-owner take.
+    if (quiz.userId === userId) {
+      await tx.update(quizzes).set({ completedAt: new Date() }).where(eq(quizzes.id, quizId))
+    }
 
     return resultRow
   })
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
+
+  // Bump marketplace play count for non-owner takes (mirrors the public-submit path).
+  if (quiz.userId !== userId) {
+    await incrementPlayCount(quizId).catch(() => {})
+  }
 
   // Grade open-ended answers synchronously so the response carries the final
   // score. In-process fire-and-forget didn't survive on serverless — the host
@@ -335,6 +344,7 @@ export const submitPublicQuiz = async (
   shareToken: string,
   name: string,
   rawAnswers: SubmitAnswerInput[],
+  userId?: string,
 ): Promise<PublicSubmitResult | null> => {
   const [quiz] = await db
     .select({ id: quizzes.id })
@@ -489,6 +499,65 @@ export const submitPublicQuiz = async (
       correctOptionIds: [...(correctOptionIdsByQuestion.get(q.id) ?? new Set<string>())],
     }
   })
+
+  // Bump marketplace play count if this quiz is listed (no-op otherwise).
+  await incrementPlayCount(quizId).catch(() => {})
+
+  // Persist the attempt for a logged-in taker so it shows in history/analytics.
+  // Reuses the verdicts already computed above — no second grading call. We do
+  // NOT touch quizzes.completedAt here: the taker is (typically) not the owner,
+  // and completedAt is an owner-scoped quiz field.
+  if (userId) {
+    const isCorrectFor = (qId: string, type: string): boolean | null => {
+      if (type === 'open_ended') {
+        const answered = (answersByQuestion.get(qId)?.textAnswer?.trim() ?? '').length > 0
+        if (openEndedGradingFailed && answered) return null
+        return openEndedVerdicts.get(qId) ?? false
+      }
+      return scoreResult.correctnessByQuestion.get(qId) ?? false
+    }
+
+    const answerValues = quizQuestions.map((q) => {
+      const a = answersByQuestion.get(q.id)
+      return {
+        userId,
+        questionId: q.id,
+        selectedOptionId: a?.selectedOptionId ?? null,
+        selectedOptionIds: a?.selectedOptionIds ?? null,
+        textAnswer: a?.textAnswer ?? null,
+        isCorrect: isCorrectFor(q.id, q.type as string),
+        updatedAt: new Date(),
+      }
+    })
+
+    const gradingStatus = openEndedGradingFailed ? 'failed' : 'complete'
+
+    await db.transaction(async (tx) => {
+      if (answerValues.length > 0) {
+        await tx
+          .insert(userAnswers)
+          .values(answerValues)
+          .onConflictDoUpdate({
+            target: [userAnswers.userId, userAnswers.questionId],
+            set: {
+              selectedOptionId: sql`excluded.selected_option_id`,
+              selectedOptionIds: sql`excluded.selected_option_ids`,
+              textAnswer: sql`excluded.text_answer`,
+              isCorrect: sql`excluded.is_correct`,
+              updatedAt: new Date(),
+            },
+          })
+      }
+      await tx.insert(quizResults).values({
+        userId,
+        quizId,
+        totalQuestions,
+        correctAnswers,
+        wrongAnswers,
+        gradingStatus,
+      })
+    })
+  }
 
   return { name, totalQuestions, correctAnswers, wrongAnswers, review }
 }

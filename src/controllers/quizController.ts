@@ -162,7 +162,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
   try {
     const userId = getAuthUserId(req)
 
-    const { limit, offset, search, types, sort, excludeFolderId } =
+    const { limit, offset, search, types, sort, excludeFolderId, status } =
       req.query as unknown as GetQuizzesQuery
 
     const { items, total } = await getQuizzes({
@@ -173,6 +173,7 @@ export const getQuizzesController = async (req: Request, res: Response, next: Ne
       types,
       sort,
       excludeFolderId,
+      status,
     })
 
     res.status(200).json(
@@ -210,7 +211,7 @@ export const getPublicQuizController = async (
 }
 
 export const submitPublicQuizController = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) => {
@@ -220,7 +221,9 @@ export const submitPublicQuizController = async (
     if (!shareToken) throw new AppError('Share token is required', 400, 'VALIDATION_ERROR')
 
     const { name, answers } = req.body as PublicSubmitInput
-    const result = await submitPublicQuiz(shareToken, name.trim(), answers)
+    // optionalAuthMiddleware populates req.user when a valid session cookie is
+    // present; logged-in takes persist (history/analytics), anonymous stay ephemeral.
+    const result = await submitPublicQuiz(shareToken, name.trim(), answers, req.user?.id)
 
     if (!result) throw new AppError('Quiz not found or is not public', 404, 'NOT_FOUND')
 
