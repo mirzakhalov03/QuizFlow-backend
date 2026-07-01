@@ -97,12 +97,15 @@ export const getQuizzesInFolder = async (req: AuthRequest, res: Response, next: 
     const id = req.params.id as string
     const { limit, offset } = req.query as unknown as GetQuizzesInFolderQuery
 
-    // Check if folder exists first
-    const folder = await folderService.getFolderById(req.user!.id, id)
+    // Check if folder exists and retrieve quizzes in parallel
+    const [folder, { items, total }] = await Promise.all([
+      folderService.getFolderById(req.user!.id, id),
+      folderService.getQuizzesInFolder(req.user!.id, id, limit, offset),
+    ])
+
     if (!folder) {
       throw new AppError('Folder not found', 404, 'NOT_FOUND')
     }
-    const { items, total } = await folderService.getQuizzesInFolder(req.user!.id, id, limit, offset)
     return res.json(
       successResponse('Quizzes in folder retrieved', {
         items,
