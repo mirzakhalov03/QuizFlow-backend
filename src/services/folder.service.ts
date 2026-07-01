@@ -3,7 +3,13 @@ import { and, eq, sql, inArray } from 'drizzle-orm'
 import { db } from '../database/database'
 import { folders, quizzes } from '../database/schema'
 
-export const getFolders = async (userId: string) => {
+export const getFolders = async (userId: string, search?: string) => {
+  const conditions = [eq(folders.userId, userId)]
+
+  if (search?.trim()) {
+    conditions.push(sql`lower(${folders.name}) like ${'%' + search.toLowerCase() + '%'}`)
+  }
+
   const userFolders = await db
     .select({
       id: folders.id,
@@ -14,7 +20,7 @@ export const getFolders = async (userId: string) => {
     })
     .from(folders)
     .leftJoin(quizzes, eq(quizzes.folderId, folders.id))
-    .where(eq(folders.userId, userId))
+    .where(and(...conditions))
     .groupBy(folders.id)
     .orderBy(folders.name)
 
