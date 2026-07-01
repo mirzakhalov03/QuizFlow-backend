@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
 
+import { cacheDel, cacheGetJson, cacheSetJson } from './clients/redis.client'
 import { DEFAULT_MODEL } from '../constants/models'
 import { db } from '../database/database'
 import { folders, questions, quizJobs, quizResults, quizzes } from '../database/schema'
@@ -88,7 +89,28 @@ const toPercent = (correct: number, total: number) => (total > 0 ? (correct / to
 
 const round = (n: number) => Math.round(n * 100) / 100
 
+// Analytics recomputes several joins + in-memory rollups on every page load, so
+// we cache the result per user. Default 3h TTL; invalidated eagerly on new attempts.
+const ANALYTICS_CACHE_TTL_SECONDS = Number(process.env.ANALYTICS_CACHE_TTL_SECONDS) || 3 * 60 * 60
+
+const analyticsCacheKey = (userId: string) => `analytics:summary:${userId}`
+
+/** Drop a user's cached analytics so their next read recomputes (e.g. after a new attempt). */
+export const invalidateAnalyticsCache = (userId: string): Promise<void> =>
+  cacheDel(analyticsCacheKey(userId))
+
 export const getAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
+  const cacheKey = analyticsCacheKey(userId)
+
+  const cached = await cacheGetJson<AnalyticsSummary>(cacheKey)
+  if (cached) return cached
+
+  const summary = await computeAnalyticsSummary(userId)
+  await cacheSetJson(cacheKey, summary, ANALYTICS_CACHE_TTL_SECONDS)
+  return summary
+}
+
+const computeAnalyticsSummary = async (userId: string): Promise<AnalyticsSummary> => {
   // These three reads are independent, so run them concurrently rather than
   // serializing the round-trips. `questionTypeRows` counts every question across
   // all quizzes the user owns (taken or not), so a mixed-type quiz contributes

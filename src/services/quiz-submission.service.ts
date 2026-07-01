@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 
+import { invalidateAnalyticsCache } from './analytics.service'
 import { incrementPlayCount } from './marketplace.service'
 import {
   gradeOpenEndedAnswers,
@@ -287,6 +288,10 @@ export const submitQuiz = async (
   })
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
+
+  // A new attempt makes this user's cached analytics stale — drop it so their
+  // next dashboard load recomputes instead of waiting out the TTL.
+  await invalidateAnalyticsCache(userId)
 
   // Bump marketplace play count for non-owner takes (mirrors the public-submit path).
   if (quiz.userId !== userId) {
