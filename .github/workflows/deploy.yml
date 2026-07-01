@@ -64,8 +64,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "dist/,package.json,package-lock.json"
-          target: "/home/ec2-user/app"
+          source: 'dist/,package.json,package-lock.json'
+          target: '/home/ec2-user/app'
 
       - name: Install dependencies and restart on EC2
         uses: appleboy/ssh-action@v1.0.3
