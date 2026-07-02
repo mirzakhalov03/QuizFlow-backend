@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 
+import { invalidateAnalyticsCache } from './analytics.service'
 import { incrementPlayCount } from './marketplace.service'
 import {
   gradeOpenEndedAnswers,
@@ -288,6 +289,10 @@ export const submitQuiz = async (
 
   logger.info('Quiz submitted successfully', { quizId, userId, resultId: result.id })
 
+  // A new attempt makes this user's cached analytics stale — drop it so their
+  // next dashboard load recomputes instead of waiting out the TTL.
+  await invalidateAnalyticsCache(userId)
+
   // Bump marketplace play count for non-owner takes (mirrors the public-submit path).
   if (quiz.userId !== userId) {
     await incrementPlayCount(quizId).catch(() => {})
@@ -301,6 +306,11 @@ export const submitQuiz = async (
   // never throws; we just re-read the row it updated in place.
   if (gradingStatus === 'pending') {
     await gradeOpenEndedAnswers(result.id, quizId, userId)
+
+    // Grading rewrote correctAnswers/status on this row. The invalidation above ran
+    // pre-grading, so a concurrent read could have recached the partial totals —
+    // drop it again now that the attempt is finalized.
+    await invalidateAnalyticsCache(userId)
 
     const [finalized] = await db
       .select()
@@ -557,6 +567,10 @@ export const submitPublicQuiz = async (
         gradingStatus,
       })
     })
+
+    // This attempt counts toward the logged-in taker's analytics — drop their
+    // cache so the next dashboard load reflects it (mirrors submitQuiz).
+    await invalidateAnalyticsCache(userId)
   }
 
   return { name, totalQuestions, correctAnswers, wrongAnswers, review }

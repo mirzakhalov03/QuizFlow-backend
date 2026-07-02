@@ -19,7 +19,16 @@ const { dbMock, queue } = vi.hoisted(() => {
   return { dbMock: builder, queue }
 })
 
+const { cacheMock } = vi.hoisted(() => ({
+  cacheMock: {
+    cacheGetJson: vi.fn(),
+    cacheSetJson: vi.fn(),
+    cacheDel: vi.fn(),
+  },
+}))
+
 vi.mock('../../src/database/database', () => ({ db: dbMock }))
+vi.mock('../../src/services/clients/redis.client', () => cacheMock)
 
 const byType = (breakdown: Array<{ type: string; questionCount: number }>) =>
   Object.fromEntries(breakdown.map((t) => [t.type, t.questionCount]))
@@ -28,6 +37,10 @@ describe('AnalyticsService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queue.length = 0
+    // Default to a cache miss so the compute path runs; individual tests override.
+    cacheMock.cacheGetJson.mockResolvedValue(null)
+    cacheMock.cacheSetJson.mockResolvedValue(undefined)
+    cacheMock.cacheDel.mockResolvedValue(undefined)
   })
 
   describe('getAnalyticsSummary', () => {
@@ -142,6 +155,31 @@ describe('AnalyticsService', () => {
       expect(byFolder['folder-b'].open_ended).to.equal(3)
       expect(byFolder['folder-b'].multiple_choice).to.equal(0)
       expect(byFolder['null'].multiple_choice).to.equal(4)
+    })
+  })
+
+  describe('getAnalyticsSummary caching', () => {
+    it('returns the cached summary and skips recomputation on a cache hit', async () => {
+      const cached = { totalQuizzesTaken: 7, averageScore: 42 }
+      cacheMock.cacheGetJson.mockResolvedValueOnce(cached)
+
+      const result = await analyticsService.getAnalyticsSummary('user-1')
+
+      expect(result).to.equal(cached)
+      // Cache hit short-circuits: no DB reads, and we don't rewrite the cache.
+      expect(dbMock.select.mock.calls).to.have.lengthOf(0)
+      expect(cacheMock.cacheSetJson.mock.calls).to.have.lengthOf(0)
+    })
+
+    it('recomputes and caches when Redis is unavailable or holds no value', async () => {
+      // cacheGetJson fails open to null (miss / read error / malformed JSON).
+      cacheMock.cacheGetJson.mockResolvedValueOnce(null)
+      queue.push([], [], [])
+
+      const result = await analyticsService.getAnalyticsSummary('user-1')
+
+      expect(result.totalQuizzesTaken).to.equal(0)
+      expect(cacheMock.cacheSetJson.mock.calls).to.have.lengthOf(1)
     })
   })
 })

@@ -73,6 +73,62 @@ const getRedisClient = async (): Promise<RedisClient> => {
   }
 }
 
+/**
+ * Read a JSON-serialized value from the cache. Fails open: on a miss, a parse
+ * error, or an unreachable Redis, returns null so callers recompute from source.
+ */
+export const cacheGetJson = async <T>(key: string): Promise<T | null> => {
+  try {
+    const redis = await getRedisClient()
+    const raw = await redis.get(key)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as T
+    } catch (err) {
+      // Corrupt entry: evict it so we don't recompute + warn on every read until TTL.
+      await redis.del(key).catch(() => {})
+      logger.warn('Redis cache contained invalid JSON, evicting and falling back to source', {
+        key,
+        error: errText(err),
+      })
+      return null
+    }
+  } catch (err) {
+    logger.warn('Redis cache read failed, falling back to source', { key, error: errText(err) })
+    return null
+  }
+}
+
+/** Write a JSON-serialized value with a TTL. Fails open — a write miss just means a later recompute. */
+export const cacheSetJson = async (
+  key: string,
+  value: unknown,
+  ttlSeconds: number,
+): Promise<void> => {
+  // Redis EX requires a positive integer; skip rather than let a misconfigured TTL
+  // throw and warn on every write.
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+    logger.warn('Redis cache write skipped due to invalid TTL', { key, ttlSeconds })
+    return
+  }
+  try {
+    const redis = await getRedisClient()
+    await redis.set(key, JSON.stringify(value), { EX: ttlSeconds })
+  } catch (err) {
+    logger.warn('Redis cache write failed', { key, error: errText(err) })
+  }
+}
+
+/** Delete a cached key so the next read recomputes. Fails open — TTL is the backstop. */
+export const cacheDel = async (key: string): Promise<void> => {
+  try {
+    const redis = await getRedisClient()
+    await redis.del(key)
+  } catch (err) {
+    logger.warn('Redis cache delete failed, relying on TTL', { key, error: errText(err) })
+  }
+}
+
 const lockKey = (userId: string): string => `feedback:lock:${userId}`
 
 /**
