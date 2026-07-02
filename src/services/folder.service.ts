@@ -1,16 +1,25 @@
-import { and, eq, sql, inArray } from 'drizzle-orm'
+import { and, eq, sql, inArray, count, ilike } from 'drizzle-orm'
 
 import { db } from '../database/database'
 import { folders, quizzes } from '../database/schema'
 
-export const getFolders = async (userId: string, search?: string) => {
+export const getFolders = async (
+  userId: string,
+  limit: number = 20,
+  offset: number = 0,
+  search?: string,
+) => {
   const conditions = [eq(folders.userId, userId)]
-
-  if (search?.trim()) {
-    conditions.push(sql`lower(${folders.name}) like ${'%' + search.toLowerCase() + '%'}`)
+  if (search) {
+    conditions.push(ilike(folders.name, `%${search}%`))
   }
 
-  const userFolders = await db
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(folders)
+    .where(and(...conditions))
+
+  const items = await db
     .select({
       id: folders.id,
       name: folders.name,
@@ -23,8 +32,10 @@ export const getFolders = async (userId: string, search?: string) => {
     .where(and(...conditions))
     .groupBy(folders.id)
     .orderBy(folders.name)
+    .limit(limit)
+    .offset(offset)
 
-  return userFolders
+  return { items, total }
 }
 
 export const getFolderById = async (userId: string, folderId: string) => {
@@ -99,14 +110,28 @@ export const moveQuizToFolder = async (userId: string, quizId: string, folderId:
   return updatedQuiz
 }
 
-export const getQuizzesInFolder = async (userId: string, folderId: string) => {
-  const folderQuizzes = await db
+export const getQuizzesInFolder = async (
+  userId: string,
+  folderId: string,
+  limit: number = 20,
+  offset: number = 0,
+) => {
+  const conditions = [eq(quizzes.userId, userId), eq(quizzes.folderId, folderId)]
+
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(quizzes)
+    .where(and(...conditions))
+
+  const items = await db
     .select()
     .from(quizzes)
-    .where(and(eq(quizzes.userId, userId), eq(quizzes.folderId, folderId)))
+    .where(and(...conditions))
     .orderBy(quizzes.createdAt)
+    .limit(limit)
+    .offset(offset)
 
-  return folderQuizzes
+  return { items, total }
 }
 
 export const addQuizzesToFolder = async (userId: string, folderId: string, quizIds: string[]) => {

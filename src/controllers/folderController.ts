@@ -9,13 +9,20 @@ import {
   CreateFolderInput,
   MoveQuizToFolderInput,
   UpdateFolderInput,
+  GetFoldersQuery,
+  GetQuizzesInFolderQuery,
 } from '../validators/folder.schema'
 
 export const getFolders = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined
-    const folders = await folderService.getFolders(req.user!.id, search)
-    return res.json(successResponse('Folders retrieved', folders))
+    const { limit, offset, search } = req.query as unknown as GetFoldersQuery
+    const { items, total } = await folderService.getFolders(req.user!.id, limit, offset, search)
+    return res.json(
+      successResponse('Folders retrieved', {
+        items,
+        pagination: { limit, offset, count: total },
+      }),
+    )
   } catch (error) {
     next(error)
   }
@@ -88,13 +95,23 @@ export const moveQuizToFolder = async (req: AuthRequest, res: Response, next: Ne
 export const getQuizzesInFolder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string
-    // Check if folder exists first
-    const folder = await folderService.getFolderById(req.user!.id, id)
+    const { limit, offset } = req.query as unknown as GetQuizzesInFolderQuery
+
+    // Check if folder exists and retrieve quizzes in parallel
+    const [folder, { items, total }] = await Promise.all([
+      folderService.getFolderById(req.user!.id, id),
+      folderService.getQuizzesInFolder(req.user!.id, id, limit, offset),
+    ])
+
     if (!folder) {
       throw new AppError('Folder not found', 404, 'NOT_FOUND')
     }
-    const quizzes = await folderService.getQuizzesInFolder(req.user!.id, id)
-    return res.json(successResponse('Quizzes in folder retrieved', quizzes))
+    return res.json(
+      successResponse('Quizzes in folder retrieved', {
+        items,
+        pagination: { limit, offset, count: total },
+      }),
+    )
   } catch (error) {
     next(error)
   }

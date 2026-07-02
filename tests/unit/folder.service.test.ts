@@ -10,6 +10,7 @@ const { dbMock } = vi.hoisted(() => {
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
+    offset: vi.fn().mockReturnThis(),
     groupBy: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
@@ -35,6 +36,7 @@ describe('FolderService', () => {
     dbMock.where.mockReturnThis()
     dbMock.orderBy.mockReturnThis()
     dbMock.limit.mockReturnThis()
+    dbMock.offset.mockReturnThis()
     dbMock.groupBy.mockReturnThis()
     dbMock.leftJoin.mockReturnThis()
     dbMock.update.mockReturnThis()
@@ -48,11 +50,13 @@ describe('FolderService', () => {
   describe('getFolders', () => {
     it('should return a list of folders for a user', async () => {
       const mockFolders = [{ id: 'f-1', name: 'Folder 1', quizCount: 5 }]
-      dbMock.orderBy.mockResolvedValueOnce(mockFolders)
+      dbMock.where.mockResolvedValueOnce([{ value: 1 }])
+      dbMock.offset.mockResolvedValueOnce(mockFolders)
 
       const result = await folderService.getFolders('user-1')
-      expect(result).to.have.lengthOf(1)
-      expect(result[0].name).to.equal('Folder 1')
+      expect(result.items).to.have.lengthOf(1)
+      expect(result.total).to.equal(1)
+      expect(result.items[0].name).to.equal('Folder 1')
     })
   })
 
