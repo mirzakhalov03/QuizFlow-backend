@@ -91,7 +91,15 @@ const round = (n: number) => Math.round(n * 100) / 100
 
 // Analytics recomputes several joins + in-memory rollups on every page load, so
 // we cache the result per user. Default 3h TTL; invalidated eagerly on new attempts.
-const ANALYTICS_CACHE_TTL_SECONDS = Number(process.env.ANALYTICS_CACHE_TTL_SECONDS) || 3 * 60 * 60
+// Parse the override strictly: Redis `EX` needs a positive integer, so a missing,
+// non-numeric, float, or non-positive value falls back to the default rather than
+// handing Redis a NaN/float it would reject.
+const DEFAULT_ANALYTICS_CACHE_TTL_SECONDS = 3 * 60 * 60
+const parsedCacheTtl = parseInt(process.env.ANALYTICS_CACHE_TTL_SECONDS ?? '', 10)
+const ANALYTICS_CACHE_TTL_SECONDS =
+  Number.isInteger(parsedCacheTtl) && parsedCacheTtl > 0
+    ? parsedCacheTtl
+    : DEFAULT_ANALYTICS_CACHE_TTL_SECONDS
 
 const analyticsCacheKey = (userId: string) => `analytics:summary:${userId}`
 

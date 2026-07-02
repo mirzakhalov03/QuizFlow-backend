@@ -81,7 +81,18 @@ export const cacheGetJson = async <T>(key: string): Promise<T | null> => {
   try {
     const redis = await getRedisClient()
     const raw = await redis.get(key)
-    return raw ? (JSON.parse(raw) as T) : null
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as T
+    } catch (err) {
+      // Corrupt entry: evict it so we don't recompute + warn on every read until TTL.
+      await redis.del(key).catch(() => {})
+      logger.warn('Redis cache contained invalid JSON, evicting and falling back to source', {
+        key,
+        error: errText(err),
+      })
+      return null
+    }
   } catch (err) {
     logger.warn('Redis cache read failed, falling back to source', { key, error: errText(err) })
     return null
@@ -94,6 +105,12 @@ export const cacheSetJson = async (
   value: unknown,
   ttlSeconds: number,
 ): Promise<void> => {
+  // Redis EX requires a positive integer; skip rather than let a misconfigured TTL
+  // throw and warn on every write.
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+    logger.warn('Redis cache write skipped due to invalid TTL', { key, ttlSeconds })
+    return
+  }
   try {
     const redis = await getRedisClient()
     await redis.set(key, JSON.stringify(value), { EX: ttlSeconds })

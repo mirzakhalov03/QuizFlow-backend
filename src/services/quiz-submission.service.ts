@@ -307,6 +307,11 @@ export const submitQuiz = async (
   if (gradingStatus === 'pending') {
     await gradeOpenEndedAnswers(result.id, quizId, userId)
 
+    // Grading rewrote correctAnswers/status on this row. The invalidation above ran
+    // pre-grading, so a concurrent read could have recached the partial totals —
+    // drop it again now that the attempt is finalized.
+    await invalidateAnalyticsCache(userId)
+
     const [finalized] = await db
       .select()
       .from(quizResults)
@@ -562,6 +567,10 @@ export const submitPublicQuiz = async (
         gradingStatus,
       })
     })
+
+    // This attempt counts toward the logged-in taker's analytics — drop their
+    // cache so the next dashboard load reflects it (mirrors submitQuiz).
+    await invalidateAnalyticsCache(userId)
   }
 
   return { name, totalQuestions, correctAnswers, wrongAnswers, review }
