@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -57,3 +57,25 @@ jobs:
           AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
           API_KEY_ENCRYPTION_SECRET: ${{ secrets.API_KEY_ENCRYPTION_SECRET }}
         run: npm run deploy:lambda
+
+      - name: Copy build to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: 'dist/,package.json,package-lock.json'
+          target: '/home/ec2-user/app'
+
+      - name: Install dependencies and restart on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/app
+            npm ci --omit=dev
+            pm2 restart quizflow-api 2>/dev/null || pm2 start dist/src/server.js --name quizflow-api
+            pm2 restart quizflow-worker 2>/dev/null || pm2 start dist/src/workers/feedbackWorker.js --name quizflow-worker
+            pm2 save
