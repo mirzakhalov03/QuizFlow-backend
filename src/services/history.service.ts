@@ -29,12 +29,14 @@ export const getQuizHistory = async (
   userId: string,
   { folderId, limit, page, sort }: HistoryQuery,
 ): Promise<HistoryResponse> => {
+  // Trailing id keeps the sort a total order: createdAt (and score) can tie, and
+  // offset paging duplicates/drops rows unless every ordering is deterministic.
   const orderBy =
     sort === 'best'
-      ? [desc(scoreExpr), desc(quizResults.createdAt)]
+      ? [desc(scoreExpr), desc(quizResults.createdAt), desc(quizResults.id)]
       : sort === 'worst'
-        ? [asc(scoreExpr), desc(quizResults.createdAt)]
-        : [desc(quizResults.createdAt)]
+        ? [asc(scoreExpr), desc(quizResults.createdAt), desc(quizResults.id)]
+        : [desc(quizResults.createdAt), desc(quizResults.id)]
 
   const where = and(
     eq(quizResults.userId, userId),
