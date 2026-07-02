@@ -34,9 +34,13 @@ app.use(
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL || 'http://localhost:5173'],
+    origin: allowedOrigins,
     credentials: true,
   }),
 )
