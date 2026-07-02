@@ -13,7 +13,8 @@ import {
 
 export const getFolders = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const folders = await folderService.getFolders(req.user!.id)
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined
+    const folders = await folderService.getFolders(req.user!.id, search)
     return res.json(successResponse('Folders retrieved', folders))
   } catch (error) {
     next(error)
