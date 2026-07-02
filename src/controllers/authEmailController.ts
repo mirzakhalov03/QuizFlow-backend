@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 
 import { successResponse } from '../helpers/apiResponse'
 import { setAuthCookies, clearAuthCookies } from '../helpers/utils/cookies'
+import { primaryFrontendUrl } from '../helpers/utils/frontendUrl'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import authEmailService from '../services/auth-email.service'
 
@@ -23,7 +24,7 @@ const confirmRegistration = async (req: Request, res: Response, next: NextFuncti
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
+    return res.redirect(`${primaryFrontendUrl}/app/quizzes`)
   } catch (error) {
     next(error)
   }
@@ -36,7 +37,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
+    return res.redirect(`${primaryFrontendUrl}/app/quizzes`)
   } catch (error) {
     next(error)
   }

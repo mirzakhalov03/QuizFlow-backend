@@ -7,6 +7,7 @@ import swaggerUi from 'swagger-ui-express'
 
 import { logger } from './config/logger'
 import { swaggerSpec } from './config/swagger'
+import { allowedOrigins } from './helpers/utils/frontendUrl'
 import { errorHandler } from './middlewares/errorHandler'
 import { handleMulterError } from './middlewares/multerUpload'
 import { notFoundHandler } from './middlewares/notFound'
@@ -34,10 +35,6 @@ app.use(
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-  .split(',')
-  .map((s) => s.trim())
-
 app.use(
   cors({
     origin: allowedOrigins,

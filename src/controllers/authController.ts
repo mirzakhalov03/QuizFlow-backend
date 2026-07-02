@@ -6,6 +6,7 @@ import { successResponse } from '../helpers/apiResponse'
 import { buildGoogleAuthUrl } from '../helpers/utils/buildGoogleAuthUrl'
 import { buildNotionAuthUrl } from '../helpers/utils/buildNotionAuthUrl'
 import { setAuthCookies, setAccessCookie, clearAuthCookies } from '../helpers/utils/cookies'
+import { primaryFrontendUrl } from '../helpers/utils/frontendUrl'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import authService from '../services/auth.service'
 
@@ -19,7 +20,7 @@ const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
 
     clearAuthCookies(res)
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}`)
+    return res.redirect(primaryFrontendUrl)
   } catch (error) {
     next(error)
   }
@@ -62,7 +63,7 @@ const googleCallback = async (req: Request, res: Response, next: NextFunction) =
 
     setAuthCookies(res, { accessToken, refreshToken })
 
-    return res.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/app/quizzes`)
+    return res.redirect(`${primaryFrontendUrl}/app/quizzes`)
   } catch (error) {
     next(error)
   }
@@ -78,7 +79,7 @@ const notionCallback = async (req: AuthRequest, res: Response, next: NextFunctio
     const error = req.query.error as string
     const user = req.user
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
+    const frontendUrl = primaryFrontendUrl
 
     if (error || !code) {
       return res.redirect(`${frontendUrl}/integrations/failure?error=access_denied`)

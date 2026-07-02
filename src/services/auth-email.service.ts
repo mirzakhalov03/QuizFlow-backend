@@ -11,13 +11,13 @@ import { logger } from '../config/logger'
 import { db } from '../database/database'
 import { users } from '../database/schema'
 import { AppError } from '../helpers/AppError'
+import { primaryFrontendUrl } from '../helpers/utils/frontendUrl'
 import { generateAccessToken, generateRefreshToken } from '../helpers/utils/jwt'
 import Otp, { RESET_EXPIRATION_MS } from '../models/otp.model'
 import User from '../models/user.model'
 
 const getResetUrl = (token: string) => {
-  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173'
-  return `${frontendUrl}/auth/reset-password?token=${token}`
+  return `${primaryFrontendUrl}/auth/reset-password?token=${token}`
 }
 
 class AuthEmailService {
