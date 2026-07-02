@@ -18,20 +18,33 @@ export type HistoryItem = {
 
 export type HistoryResponse = {
   items: HistoryItem[]
+  total: number
+  page: number
+  limit: number
 }
 
 const scoreExpr = sql<number>`(${quizResults.correctAnswers}::float / NULLIF(${quizResults.totalQuestions}, 0)) * 100`
 
 export const getQuizHistory = async (
   userId: string,
-  { folderId, limit, sort }: HistoryQuery,
+  { folderId, limit, page, sort }: HistoryQuery,
 ): Promise<HistoryResponse> => {
+  // Trailing id keeps the sort a total order: createdAt (and score) can tie, and
+  // offset paging duplicates/drops rows unless every ordering is deterministic.
   const orderBy =
     sort === 'best'
-      ? [desc(scoreExpr), desc(quizResults.createdAt)]
+      ? [desc(scoreExpr), desc(quizResults.createdAt), desc(quizResults.id)]
       : sort === 'worst'
-        ? [asc(scoreExpr), desc(quizResults.createdAt)]
-        : [desc(quizResults.createdAt)]
+        ? [asc(scoreExpr), desc(quizResults.createdAt), desc(quizResults.id)]
+        : [desc(quizResults.createdAt), desc(quizResults.id)]
+
+  const where = and(
+    eq(quizResults.userId, userId),
+    gt(quizResults.totalQuestions, 0),
+    folderId ? eq(quizzes.folderId, folderId) : undefined,
+  )
+
+  const offset = (page - 1) * limit
 
   const rows = await db
     .select({
@@ -48,15 +61,16 @@ export const getQuizHistory = async (
     .from(quizResults)
     .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
     .leftJoin(folders, eq(quizzes.folderId, folders.id))
-    .where(
-      and(
-        eq(quizResults.userId, userId),
-        gt(quizResults.totalQuestions, 0),
-        folderId ? eq(quizzes.folderId, folderId) : undefined,
-      ),
-    )
+    .where(where)
     .orderBy(...orderBy)
     .limit(limit)
+    .offset(offset)
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(quizResults)
+    .innerJoin(quizzes, eq(quizResults.quizId, quizzes.id))
+    .where(where)
 
   const items: HistoryItem[] = rows.map((r) => ({
     resultId: r.resultId,
@@ -70,5 +84,5 @@ export const getQuizHistory = async (
     completedAt: r.completedAt.toISOString(),
   }))
 
-  return { items }
+  return { items, total, page, limit }
 }
