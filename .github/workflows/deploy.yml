@@ -76,6 +76,6 @@ jobs:
           script: |
             cd /home/ec2-user/app
             npm ci --omit=dev
-            pm2 restart quizflow-api 2>/dev/null || pm2 start dist/src/server.js --name quizflow-api
-            pm2 restart quizflow-worker 2>/dev/null || pm2 start dist/src/workers/feedbackWorker.js --name quizflow-worker
+            pm2 restart quizflow-api --update-env 2>/dev/null || pm2 start dist/src/server.js --name quizflow-api
+            pm2 restart quizflow-worker --update-env 2>/dev/null || pm2 start dist/src/workers/feedbackWorker.js --name quizflow-worker
             pm2 save
