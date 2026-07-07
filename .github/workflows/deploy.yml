@@ -58,16 +58,19 @@ jobs:
           API_KEY_ENCRYPTION_SECRET: ${{ secrets.API_KEY_ENCRYPTION_SECRET }}
         run: npm run deploy:lambda
 
-      - name: Copy build to EC2
+      # Ship the source the box needs to build the image (not dist/ — the
+      # Dockerfile compiles it). node_modules/dist/.env are excluded by
+      # .dockerignore from the build context.
+      - name: Copy source to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: 'dist/,package.json,package-lock.json'
+          source: 'Dockerfile,.dockerignore,docker-compose.prod.yml,tsconfig.json,package.json,package-lock.json,src'
           target: '/home/ec2-user/app'
 
-      - name: Install dependencies and restart on EC2
+      - name: Build image and restart containers on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -75,18 +78,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ec2-user/app
-            # Chromium runtime libs for Puppeteer (PDF export). Idempotent —
-            # the package manager skips anything already installed, so this is
-            # only slow on the first deploy and free thereafter.
-            if command -v dnf >/dev/null 2>&1; then PKG=dnf; else PKG=yum; fi
-            sudo $PKG install -y \
-              nss nspr atk at-spi2-atk at-spi2-core cups-libs libdrm mesa-libgbm \
-              libxkbcommon libXcomposite libXdamage libXext libXfixes libXrandr \
-              libX11 libxcb alsa-lib pango cairo
-            npm ci --omit=dev
-            # Ensure Puppeteer's Chromium binary is present (guards against a
-            # skipped/failed post-install download). No-op if already cached.
-            npx puppeteer browsers install chrome
-            pm2 restart quizflow-api --update-env 2>/dev/null || pm2 start dist/src/server.js --name quizflow-api
-            pm2 restart quizflow-worker --update-env 2>/dev/null || pm2 start dist/src/workers/feedbackWorker.js --name quizflow-worker
-            pm2 save
+            # Build the API+worker image and (re)start both containers. Chromium
+            # and its OS libs are baked into the image by the Dockerfile, so
+            # there's no host-side package install here anymore.
+            docker compose -f docker-compose.prod.yml up -d --build
+            # Reclaim disk from the previous image layers.
+            docker image prune -f

@@ -1,0 +1,36 @@
+# Production compose for the QuizFlow backend on the single EC2 box.
+#
+# Both services run the SAME image (built once, reused) and differ only by the
+# command. Deploy with:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# network_mode: host is deliberate. The API + worker need to reach Redis, which
+# runs NATIVELY on this box bound to 127.0.0.1:6379 (not a container). Host
+# networking puts the containers on the host's network namespace, so the app's
+# existing REDIS_HOST=localhost keeps working unchanged and the API binds
+# :3000 directly. Postgres stays on RDS (reached over the network either way).
+#
+# Env comes from the box's existing /home/ec2-user/app/.env — nothing secret is
+# baked into the image.
+
+services:
+  api:
+    build: .
+    image: quizflow-backend:latest
+    command: node dist/src/server.js
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host
+
+  worker:
+    # Reuses the image built by `api` above (same tag) — the second build is a
+    # cache hit, so it's near-instant.
+    build: .
+    image: quizflow-backend:latest
+    command: node dist/src/workers/feedbackWorker.js
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host
+    depends_on:
+      - api

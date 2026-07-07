@@ -1,0 +1,29 @@
+# Keep the build context small and never leak local artifacts/secrets into the
+# image. node_modules and dist are rebuilt inside the Dockerfile.
+node_modules
+dist
+npm-debug.log*
+
+# Secrets — env is injected at runtime via docker-compose (env_file), never baked in.
+.env
+.env.*
+
+# VCS / CI / editor
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Tests & coverage — not needed to run the app in prod.
+tests
+coverage
+playwright-report
+test-results
+
+# Local-only tooling
+docker-compose.yml
+docker-compose.prod.yml
+Dockerfile
+.dockerignore
+*.md
