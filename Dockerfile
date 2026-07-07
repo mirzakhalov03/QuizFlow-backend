@@ -42,14 +42,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libxext6 libxfixes3 libxkbcommon0 libxrandr2 \
  && rm -rf /var/lib/apt/lists/*
 
+# Puppeteer's install step downloads its Chromium into PUPPETEER_CACHE_DIR, and
+# puppeteer.launch() reads the same var at runtime — so set it before install to
+# land the browser where the app looks for it (and avoid a second download).
+ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+
 # Production dependencies only.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Download the Chromium build that matches this Puppeteer version into an
-# in-image cache. PUPPETEER_CACHE_DIR is read again at runtime by
-# puppeteer.launch(), so the browser is always present — no post-deploy step.
-ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+# Belt-and-suspenders: ensure the matching Chromium is present (no-op if the
+# install already fetched it into the cache dir above).
 RUN npx puppeteer browsers install chrome
 
 # Compiled application (tsc emits to dist/src/** because rootDir is ".").

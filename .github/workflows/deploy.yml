@@ -77,7 +77,18 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Fail the step (red build) if any command below fails — without
+            # this, a failed `up` gets masked by a later succeeding command.
+            set -e
             cd /home/ec2-user/app
+            # `docker compose build` needs the buildx plugin; install it if the
+            # box doesn't have it (e.g. a fresh/re-imaged host).
+            if ! docker buildx version >/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -SL "https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64" \
+                -o /usr/local/lib/docker/cli-plugins/docker-buildx
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+            fi
             # Build the API+worker image and (re)start both containers. Chromium
             # and its OS libs are baked into the image by the Dockerfile, so
             # there's no host-side package install here anymore.

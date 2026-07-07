@@ -16,7 +16,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "validate": "npm run format && npm run lint:fix && npm run prepare",
     "test": "vitest run",
     "test:watch": "vitest",
