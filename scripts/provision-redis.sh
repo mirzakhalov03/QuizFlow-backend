@@ -63,8 +63,16 @@ echo "==> Enabling + (re)starting $SERVICE"
 sudo systemctl enable "$SERVICE"
 sudo systemctl restart "$SERVICE"
 
-echo "==> Verifying"
-if redis-cli -h 127.0.0.1 -p 6379 ping | grep -q PONG; then
+echo "==> Locating redis CLI"
+# Amazon Linux 2023's 'redis6' package ships the CLI as 'redis6-cli'.
+CLI=""
+for b in redis6-cli redis-cli; do
+  if command -v "$b" >/dev/null 2>&1; then CLI="$b"; break; fi
+done
+[ -n "$CLI" ] || { echo "ERROR: no redis CLI found"; exit 1; }
+
+echo "==> Verifying with $CLI"
+if "$CLI" -h 127.0.0.1 -p 6379 ping | grep -q PONG; then
   echo "==> OK — Redis is up on 127.0.0.1:6379"
 else
   echo "ERROR: Redis did not respond to PING"; exit 1
