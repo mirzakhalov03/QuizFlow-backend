@@ -125,6 +125,14 @@ describe('getBookmarks', () => {
         id: 'opt-1',
         text: 'Hydrogen',
         explanation: 'H2O is water made of hydrogen and oxygen.',
+        isCorrect: true,
+      },
+      {
+        questionId: 'q-mc',
+        id: 'opt-2',
+        text: 'Helium',
+        explanation: 'Helium is not H2O.',
+        isCorrect: false,
       },
     ])
 
@@ -133,6 +141,9 @@ describe('getBookmarks', () => {
     expect(result).toHaveLength(1)
     expect(result[0].question.correctOptions).toHaveLength(1)
     expect(result[0].question.correctOptions[0].text).toBe('Hydrogen')
+    expect(result[0].question.options).toHaveLength(2)
+    expect(result[0].question.options[0].text).toBe('Hydrogen')
+    expect(result[0].question.options[1].text).toBe('Helium')
     expect(result[0].question.modelAnswer).toBeNull()
   })
 
@@ -154,6 +165,7 @@ describe('getBookmarks', () => {
         id: 'opt-2',
         text: 'Plants convert light into energy...',
         explanation: null,
+        isCorrect: true,
       },
     ])
 

@@ -112,7 +112,7 @@ export const getBookmarks = async (userId: string, limit = 50, offset = 0) => {
 
   if (bookmarkRows.length === 0) return []
 
-  // ── 2. Correct options for all bookmarked questions ─────────────────────
+  // ── 2. All options for all bookmarked questions ─────────────────────────
   const questionIds = bookmarkRows.map((r) => r.questionId)
 
   const optionRows = await db
@@ -121,11 +121,11 @@ export const getBookmarks = async (userId: string, limit = 50, offset = 0) => {
       id: questionOptions.id,
       text: questionOptions.text,
       explanation: questionOptions.explanation,
+      isCorrect: questionOptions.isCorrect,
     })
     .from(questionOptions)
-    .where(
-      and(inArray(questionOptions.questionId, questionIds), eq(questionOptions.isCorrect, true)),
-    )
+    .where(inArray(questionOptions.questionId, questionIds))
+    .orderBy(questionOptions.position)
 
   // Index options by questionId for O(1) lookup
   const optionsByQuestion = new Map<string, typeof optionRows>()
@@ -155,9 +155,13 @@ export const getBookmarks = async (userId: string, limit = 50, offset = 0) => {
         // For open-ended: empty array — answer lives in modelAnswer below.
         correctOptions: isOpenEnded
           ? []
-          : opts.map((o) => ({ id: o.id, text: o.text, explanation: o.explanation })),
+          : opts
+              .filter((o) => o.isCorrect)
+              .map((o) => ({ id: o.id, text: o.text, explanation: o.explanation })),
+        // All options for rendering (only for non-open-ended questions)
+        options: isOpenEnded ? [] : opts.map((o) => ({ id: o.id, text: o.text })),
         // Only set for open-ended questions; null for choice questions.
-        modelAnswer: isOpenEnded ? (opts[0]?.text ?? null) : null,
+        modelAnswer: isOpenEnded ? (opts.find((o) => o.isCorrect)?.text ?? null) : null,
       },
     }
   })

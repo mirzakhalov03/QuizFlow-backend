@@ -106,6 +106,7 @@ describe('Bookmark Integration Tests', () => {
             text: 'What is H2O?',
             type: 'multiple_choice' as const,
             correctOptions: [{ id: 'opt-1', text: 'Water', explanation: 'H2O is water.' }],
+            options: [{ id: 'opt-1', text: 'Water' }],
             modelAnswer: null,
           },
         },
