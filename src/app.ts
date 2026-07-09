@@ -14,6 +14,7 @@ import { notFoundHandler } from './middlewares/notFound'
 import { requestLogger } from './middlewares/requestLogger'
 import analyticsRoutes from './routes/analytics.routes'
 import authRoutes from './routes/auth.routes'
+import bookmarkRoutes from './routes/bookmark.routes'
 import byokRoutes from './routes/byok.routes'
 import contactRoutes from './routes/contact.routes'
 import folderRoutes from './routes/folder.routes'
@@ -51,6 +52,7 @@ app.use(healthRoutes)
 app.use(contactRoutes)
 app.use(uploadRoutes)
 app.use(quizRoutes)
+app.use(bookmarkRoutes)
 // Registered before folderRoutes: folderRoutes applies authMiddleware globally
 // (router.use), which would otherwise intercept the public GET /marketplace routes.
 app.use(marketplaceRoutes)

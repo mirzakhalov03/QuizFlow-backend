@@ -120,6 +120,20 @@
       "when": 1782457471510,
       "tag": "0018_lonely_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783584710470,
+      "tag": "0019_marketplace_optional_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783585362860,
+      "tag": "0020_question_bookmarks",
+      "breakpoints": true
     }
   ]
 }
