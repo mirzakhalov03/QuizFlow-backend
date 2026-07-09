@@ -1,6 +1,6 @@
 {
-  "id": "c3b04319-fb1a-4ddb-938f-7e7156500fe7",
-  "prevId": "8a8a170b-26b4-40cd-a8d3-7fc00cda9a23",
+  "id": "9405a6b8-a863-47e2-8838-eacc4c804d8c",
+  "prevId": "4fd21708-555e-4171-9729-c4c54d27c1c1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -286,6 +286,13 @@
         },
         "created_at": {
           "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,

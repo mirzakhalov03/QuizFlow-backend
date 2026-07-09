@@ -1,13 +1,13 @@
--- Adds the question_bookmarks table for the bookmark feature.
--- Fully idempotent: safe whether the table already exists or not.
-
 CREATE TABLE IF NOT EXISTS "question_bookmarks" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"question_id" uuid NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "question_bookmarks_user_question_unique" UNIQUE("user_id","question_id")
 );
+--> statement-breakpoint
+ALTER TABLE "question_bookmarks" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now() NOT NULL;
 --> statement-breakpoint
 DO $$ BEGIN
   IF NOT EXISTS (

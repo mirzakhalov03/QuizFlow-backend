@@ -295,6 +295,10 @@ export const questionBookmarks = pgTable(
       .notNull()
       .references(() => questions.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
   },
   (table) => ({
     userIdIdx: index('question_bookmarks_user_id_idx').on(table.userId),

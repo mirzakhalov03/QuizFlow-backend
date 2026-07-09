@@ -1,5 +1,5 @@
 {
-  "id": "c3b04319-fb1a-4ddb-938f-7e7156500fe7",
+  "id": "4fd21708-555e-4171-9729-c4c54d27c1c1",
   "prevId": "8a8a170b-26b4-40cd-a8d3-7fc00cda9a23",
   "version": "7",
   "dialect": "postgresql",
@@ -255,101 +255,6 @@
           "name": "otps_key_unique",
           "nullsNotDistinct": false,
           "columns": ["key"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.question_bookmarks": {
-      "name": "question_bookmarks",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "question_id": {
-          "name": "question_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "question_bookmarks_user_id_idx": {
-          "name": "question_bookmarks_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "question_bookmarks_question_id_idx": {
-          "name": "question_bookmarks_question_id_idx",
-          "columns": [
-            {
-              "expression": "question_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "question_bookmarks_user_id_users_id_fk": {
-          "name": "question_bookmarks_user_id_users_id_fk",
-          "tableFrom": "question_bookmarks",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "question_bookmarks_question_id_questions_id_fk": {
-          "name": "question_bookmarks_question_id_questions_id_fk",
-          "tableFrom": "question_bookmarks",
-          "tableTo": "questions",
-          "columnsFrom": ["question_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "question_bookmarks_user_question_unique": {
-          "name": "question_bookmarks_user_question_unique",
-          "nullsNotDistinct": false,
-          "columns": ["user_id", "question_id"]
         }
       },
       "policies": {},

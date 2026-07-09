@@ -140,6 +140,21 @@ export const getBookmarks = async (userId: string, limit = 50, offset = 0) => {
     const opts = optionsByQuestion.get(row.questionId) ?? []
     const isOpenEnded = row.questionType === 'open_ended'
 
+    const correctOptions: { id: string; text: string; explanation: string | null }[] = []
+    const options: { id: string; text: string }[] = []
+    let modelAnswer: string | null = null
+
+    for (const o of opts) {
+      if (!isOpenEnded) {
+        options.push({ id: o.id, text: o.text })
+        if (o.isCorrect) {
+          correctOptions.push({ id: o.id, text: o.text, explanation: o.explanation })
+        }
+      } else if (o.isCorrect) {
+        modelAnswer = o.text
+      }
+    }
+
     return {
       bookmarkId: row.bookmarkId,
       bookmarkedAt: row.bookmarkedAt,
@@ -151,17 +166,9 @@ export const getBookmarks = async (userId: string, limit = 50, offset = 0) => {
         id: row.questionId,
         text: row.questionText,
         type: row.questionType,
-        // For choice questions: correct option(s) with text + explanation.
-        // For open-ended: empty array — answer lives in modelAnswer below.
-        correctOptions: isOpenEnded
-          ? []
-          : opts
-              .filter((o) => o.isCorrect)
-              .map((o) => ({ id: o.id, text: o.text, explanation: o.explanation })),
-        // All options for rendering (only for non-open-ended questions)
-        options: isOpenEnded ? [] : opts.map((o) => ({ id: o.id, text: o.text })),
-        // Only set for open-ended questions; null for choice questions.
-        modelAnswer: isOpenEnded ? (opts.find((o) => o.isCorrect)?.text ?? null) : null,
+        correctOptions,
+        options,
+        modelAnswer,
       },
     }
   })
