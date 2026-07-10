@@ -284,6 +284,32 @@ export const marketplaceListings = pgTable(
   }),
 )
 
+export const questionBookmarks = pgTable(
+  'question_bookmarks',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('question_bookmarks_user_id_idx').on(table.userId),
+    questionIdIdx: index('question_bookmarks_question_id_idx').on(table.questionId),
+    userQuestionUnique: unique('question_bookmarks_user_question_unique').on(
+      table.userId,
+      table.questionId,
+    ),
+  }),
+)
+
 export const quizRatings = pgTable(
   'quiz_ratings',
   {
@@ -309,6 +335,7 @@ export const quizRatings = pgTable(
 )
 
 export const usersRelations = relations(users, ({ many, one }) => ({
+  bookmarks: many(questionBookmarks),
   profile: one(userProfiles, {
     fields: [users.id],
     references: [userProfiles.userId],
@@ -371,6 +398,18 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   }),
   options: many(questionOptions),
   answers: many(userAnswers),
+  bookmarks: many(questionBookmarks),
+}))
+
+export const questionBookmarksRelations = relations(questionBookmarks, ({ one }) => ({
+  user: one(users, {
+    fields: [questionBookmarks.userId],
+    references: [users.id],
+  }),
+  question: one(questions, {
+    fields: [questionBookmarks.questionId],
+    references: [questions.id],
+  }),
 }))
 
 export const questionOptionsRelations = relations(questionOptions, ({ one, many }) => ({
