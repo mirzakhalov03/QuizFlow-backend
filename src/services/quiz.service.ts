@@ -7,6 +7,7 @@ import {
   questionOptions,
   questions,
   quizJobs,
+  quizResults,
   quizzes,
   users,
 } from '../database/schema'
@@ -140,10 +141,32 @@ export const getQuizById = async (id: string, userId: string) => {
     if (row.option) q.options.push(row.option)
   }
 
+  // Kept as a separate query rather than joined above: joining quiz_results into
+  // the questions/options join would multiply rows per question/option and need
+  // extra dedup. This is a single indexed row lookup instead — one small extra
+  // round-trip rather than inflating the main join's row count. Only fetched for
+  // the owner viewing their own completed quiz; a non-owner viewing a public
+  // quiz has no "last attempt" of their own to show here.
+  let lastAttempt: { correctAnswers: number; totalQuestions: number } | null = null
+  if (rows[0].quiz.completedAt && rows[0].quiz.userId === userId) {
+    const [latestResult] = await db
+      .select({
+        correctAnswers: quizResults.correctAnswers,
+        totalQuestions: quizResults.totalQuestions,
+      })
+      .from(quizResults)
+      .where(and(eq(quizResults.quizId, id), eq(quizResults.userId, userId)))
+      .orderBy(desc(quizResults.createdAt))
+      .limit(1)
+
+    lastAttempt = latestResult ?? null
+  }
+
   return {
     ...rows[0].quiz,
     apiKeyId: rows[0].apiKeyId,
     apiKeyName: rows[0].apiKeyName,
+    lastAttempt,
     questions: [...questionsById.values()],
   }
 }
